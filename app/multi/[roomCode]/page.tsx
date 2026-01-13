@@ -70,8 +70,8 @@ export default function MultiGameRoom() {
           }
 
           // Set currentRoom/currentPseudo for this socket instance
-          currentRoom = roomCode;
-          currentPseudo = storedPseudo;
+          let currentRoom = roomCode;
+          let currentPseudo = storedPseudo;
         });
       } else {
         console.log('[multi-room] attempting join with pseudo', storedPseudo);
