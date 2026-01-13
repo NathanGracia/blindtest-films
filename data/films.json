@@ -1,0 +1,51 @@
+[
+  {
+    "id": 1,
+    "title": "Le Roi Lion",
+    "acceptedAnswers": ["roi lion", "le roi lion", "lion king", "the lion king"],
+    "audioFile": "/audio/roi-lion.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 2,
+    "title": "Pirates des Caraïbes",
+    "acceptedAnswers": ["pirates des caraibes", "pirates of the caribbean", "pirates caraibes", "pirate des caraibes"],
+    "audioFile": "/audio/pirates-caraibes.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 3,
+    "title": "Harry Potter",
+    "acceptedAnswers": ["harry potter", "hp"],
+    "audioFile": "/audio/harry-potter.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 4,
+    "title": "Star Wars",
+    "acceptedAnswers": ["star wars", "starwars", "la guerre des etoiles"],
+    "audioFile": "/audio/star-wars.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 6,
+    "title": "Titanic",
+    "acceptedAnswers": ["titanic"],
+    "audioFile": "/audio/titanic.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 7,
+    "title": "Indiana Jones",
+    "acceptedAnswers": ["indiana jones", "indy", "indiana"],
+    "audioFile": "/audio/indiana-jones.mp3",
+    "timeLimit": 30
+  },
+  {
+    "id": 8,
+    "title": "Le Seigneur des Anneaux",
+    "acceptedAnswers": ["seigneur des anneaux", "le seigneur des anneaux", "lord of the rings", "lotr"],
+    "audioFile": "/audio/seigneur-anneaux.mp3",
+    "timeLimit": 30
+  }
+]

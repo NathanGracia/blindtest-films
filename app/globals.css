@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
+
+  /* Frutiger Aero Colors */
+  --aero-blue: #4a90d9;
+  --aero-light-blue: #7ec8e3;
+  --aero-green: #7fba00;
+  --aero-aqua: #00b4d8;
+  --aero-glass: rgba(255, 255, 255, 0.15);
+  --aero-glass-border: rgba(255, 255, 255, 0.3);
+  --aero-glass-dark: rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
@@ -12,15 +21,195 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100vh;
+}
+
+/* Frutiger Aero Aurora Background */
+.aero-bg {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(74, 144, 217, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(0, 180, 216, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(127, 186, 0, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 90%, rgba(126, 200, 227, 0.2) 0%, transparent 50%),
+    linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+  background-attachment: fixed;
+}
+
+/* Glass Panel Effect */
+.glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Glossy Button */
+.btn-aero {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.2) 100%
+  ),
+  linear-gradient(180deg, #4a90d9 0%, #2563eb 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-aero:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(0, 0, 0, 0.05) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  ),
+  linear-gradient(180deg, #5a9fe9 0%, #3573fb 100%);
+  box-shadow:
+    0 4px 12px rgba(74, 144, 217, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.btn-aero-green {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.2) 100%
+  ),
+  linear-gradient(180deg, #7fba00 0%, #5a8400 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-aero-green:hover {
+  box-shadow:
+    0 4px 12px rgba(127, 186, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Glass Input */
+.input-aero {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.input-aero:focus {
+  border-color: rgba(74, 144, 217, 0.8);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 8px rgba(74, 144, 217, 0.5);
+  outline: none;
+}
+
+/* Progress Bar Aero */
+.progress-aero {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-aero-fill {
+  background: linear-gradient(
+    180deg,
+    #7fba00 0%,
+    #5a8400 50%,
+    #4a7000 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 8px rgba(127, 186, 0, 0.5);
+}
+
+.progress-aero-fill-danger {
+  background: linear-gradient(
+    180deg,
+    #e74c3c 0%,
+    #c0392b 50%,
+    #a93226 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 8px rgba(231, 76, 60, 0.5);
+}
+
+/* Shine animation */
+@keyframes shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.shine {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shine 3s infinite;
+}
+
+/* Glow effect */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(74, 144, 217, 0.6);
+}
+
+.glow-green {
+  box-shadow: 0 0 20px rgba(127, 186, 0, 0.6);
+}
+
+/* Make all native buttons show a clickable cursor; disabled buttons show not-allowed */
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+button[disabled] {
+  cursor: not-allowed;
+}
+
+/* Text glow */
+.text-glow {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
