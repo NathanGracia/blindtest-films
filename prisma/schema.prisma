@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Category {
+  id     String  @id
+  name   String
+  icon   String
+  color  String
+  tracks Track[]
+}
+
+model Track {
+  id              Int      @id @default(autoincrement())
+  title           String
+  acceptedAnswers String   // Stocké en JSON
+  audioFile       String
+  imageFile       String?
+  timeLimit       Int      @default(30)
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id])
+}

@@ -1,11 +1,10 @@
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config();
 
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
-const fs = require('fs');
-const path = require('path');
+const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -13,17 +12,15 @@ const port = 3000;
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
+const prisma = new PrismaClient();
 
-// Charger les tracks
-const tracksPath = path.join(__dirname, 'data', 'tracks.json');
-const categoriesPath = path.join(__dirname, 'data', 'categories.json');
-
-function loadTracks() {
-  return JSON.parse(fs.readFileSync(tracksPath, 'utf-8'));
-}
-
-function loadCategories() {
-  return JSON.parse(fs.readFileSync(categoriesPath, 'utf-8'));
+// Charger les tracks depuis la base de données
+async function loadTracks() {
+  const tracks = await prisma.track.findMany();
+  return tracks.map(track => ({
+    ...track,
+    acceptedAnswers: JSON.parse(track.acceptedAnswers),
+  }));
 }
 
 // Stockage des rooms en mémoire
@@ -90,48 +87,53 @@ app.prepare().then(() => {
     let currentPseudo = null;
 
     // Créer une room
-    socket.on('room:create', (pseudo, categories, callback) => {
+    socket.on('room:create', async (pseudo, categories, callback) => {
       // Support de l'ancienne API (sans catégories)
       if (typeof categories === 'function') {
         callback = categories;
         categories = null;
       }
 
-      let code = generateRoomCode();
-      while (rooms.has(code)) {
-        code = generateRoomCode();
+      try {
+        let code = generateRoomCode();
+        while (rooms.has(code)) {
+          code = generateRoomCode();
+        }
+
+        // Charger et filtrer les tracks
+        const allTracks = await loadTracks();
+        const filteredTracks = filterTracksByCategories(allTracks, categories);
+
+        if (filteredTracks.length === 0) {
+          callback(null, 'Aucune musique disponible pour les catégories sélectionnées');
+          return;
+        }
+
+        const room = {
+          code,
+          players: [{ id: socket.id, pseudo, score: 0 }],
+          currentTrackIndex: 0,
+          isPlaying: false,
+          hostId: socket.id,
+          tracks: shuffleArray(filteredTracks),
+          categories: categories || [],
+          timer: null,
+          timeRemaining: 30,
+          roundFound: false,
+          deletionTimer: null,
+        };
+
+        rooms.set(code, room);
+        socket.join(code);
+        currentRoom = code;
+        currentPseudo = pseudo;
+
+        console.log(`Room ${code} créée par ${pseudo} avec ${filteredTracks.length} tracks`);
+        callback(code);
+      } catch (error) {
+        console.error('Erreur création room:', error);
+        callback(null, 'Erreur serveur');
       }
-
-      // Charger et filtrer les tracks
-      const allTracks = loadTracks();
-      const filteredTracks = filterTracksByCategories(allTracks, categories);
-
-      if (filteredTracks.length === 0) {
-        callback(null, 'Aucune musique disponible pour les catégories sélectionnées');
-        return;
-      }
-
-      const room = {
-        code,
-        players: [{ id: socket.id, pseudo, score: 0 }],
-        currentTrackIndex: 0,
-        isPlaying: false,
-        hostId: socket.id,
-        tracks: shuffleArray(filteredTracks),
-        categories: categories || [],
-        timer: null,
-        timeRemaining: 30,
-        roundFound: false,
-        deletionTimer: null,
-      };
-
-      rooms.set(code, room);
-      socket.join(code);
-      currentRoom = code;
-      currentPseudo = pseudo;
-
-      console.log(`Room ${code} créée par ${pseudo} avec ${filteredTracks.length} tracks`);
-      callback(code);
     });
 
     // Rejoindre une room
@@ -214,38 +216,42 @@ app.prepare().then(() => {
     });
 
     // Lancer la partie
-    socket.on('game:start', () => {
+    socket.on('game:start', async () => {
       if (!currentRoom) return;
       const room = rooms.get(currentRoom);
       if (!room || room.hostId !== socket.id) return;
 
-      // Recharger et refiltrer les tracks
-      const allTracks = loadTracks();
-      const filteredTracks = filterTracksByCategories(allTracks, room.categories);
-      room.tracks = shuffleArray(filteredTracks);
+      try {
+        // Recharger et refiltrer les tracks
+        const allTracks = await loadTracks();
+        const filteredTracks = filterTracksByCategories(allTracks, room.categories);
+        room.tracks = shuffleArray(filteredTracks);
 
-      room.isPlaying = true;
-      room.currentTrackIndex = 0;
-      room.roundFound = false;
+        room.isPlaying = true;
+        room.currentTrackIndex = 0;
+        room.roundFound = false;
 
-      // Reset scores
-      room.players.forEach(p => p.score = 0);
+        // Reset scores
+        room.players.forEach(p => p.score = 0);
 
-      const currentTrack = room.tracks[room.currentTrackIndex];
-      room.timeRemaining = currentTrack.timeLimit;
+        const currentTrack = room.tracks[room.currentTrackIndex];
+        room.timeRemaining = currentTrack.timeLimit;
 
-      io.to(currentRoom).emit('game:start', {
-        trackIndex: room.currentTrackIndex,
-        audioFile: currentTrack.audioFile,
-        imageFile: currentTrack.imageFile,
-        timeLimit: currentTrack.timeLimit,
-        totalTracks: room.tracks.length,
-      });
+        io.to(currentRoom).emit('game:start', {
+          trackIndex: room.currentTrackIndex,
+          audioFile: currentTrack.audioFile,
+          imageFile: currentTrack.imageFile,
+          timeLimit: currentTrack.timeLimit,
+          totalTracks: room.tracks.length,
+        });
 
-      // Démarrer le timer
-      startTimer(room, currentRoom, io);
+        // Démarrer le timer
+        startTimer(room, currentRoom, io);
 
-      console.log(`Partie lancée dans la room ${currentRoom}`);
+        console.log(`Partie lancée dans la room ${currentRoom}`);
+      } catch (error) {
+        console.error('Erreur lancement partie:', error);
+      }
     });
 
     // Soumettre une réponse

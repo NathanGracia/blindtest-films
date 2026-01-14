@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx prisma init:*)",
+      "Bash(del \"C:\\\\Users\\\\nathan\\\\Documents\\\\projets\\\\blindtest-films\\\\.env.local\")",
+      "Bash(npx prisma:*)",
+      "Bash(npm run db:seed:*)",
+      "Bash(node -e:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }
