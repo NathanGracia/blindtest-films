@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getSocket } from '@/lib/socket';
+import CategorySelector from '@/components/CategorySelector';
 
 export default function MultiLobby() {
   const router = useRouter();
@@ -11,11 +12,33 @@ export default function MultiLobby() {
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  // Charger la sélection sauvegardée
+  useEffect(() => {
+    const saved = sessionStorage.getItem('blindtest_categories');
+    if (saved) {
+      try {
+        setSelectedCategories(JSON.parse(saved));
+      } catch {
+        // Ignorer les erreurs de parsing
+      }
+    }
+  }, []);
+
+  const handleSelectionChange = useCallback((selected: string[]) => {
+    setSelectedCategories(selected);
+    sessionStorage.setItem('blindtest_categories', JSON.stringify(selected));
+  }, []);
 
   const handleCreate = () => {
-    console.log('[multi] handleCreate', pseudo);
     if (!pseudo.trim()) {
       setError('Entre un pseudo');
+      return;
+    }
+
+    if (selectedCategories.length === 0) {
+      setError('Sélectionne au moins une catégorie');
       return;
     }
 
@@ -23,18 +46,21 @@ export default function MultiLobby() {
     setError('');
 
     const socket = getSocket();
-    console.log('[multi] socket', socket?.id, 'connected?', socket?.connected);
-    socket.on('connect_error', (err: any) => {
+    socket.on('connect_error', (err: Error) => {
       console.error('[multi] socket connect_error', err);
       setError('Erreur de connexion au serveur');
       setIsLoading(false);
     });
 
-    socket.emit('room:create', pseudo.trim(), (code: string) => {
-      sessionStorage.setItem('blindtest_pseudo', pseudo.trim());
-      // Mark that this client just created the room so the room page won't attempt to re-join
-      try { sessionStorage.setItem('blindtest_created_room', code); } catch (e) {}
-      router.push(`/multi/${code}`);
+    socket.emit('room:create', pseudo.trim(), selectedCategories, (code: string | null, errorMsg?: string) => {
+      if (code) {
+        sessionStorage.setItem('blindtest_pseudo', pseudo.trim());
+        try { sessionStorage.setItem('blindtest_created_room', code); } catch {}
+        router.push(`/multi/${code}`);
+      } else {
+        setError(errorMsg || 'Erreur lors de la création de la room');
+        setIsLoading(false);
+      }
     });
   };
 
@@ -101,6 +127,14 @@ export default function MultiLobby() {
           </div>
         )}
 
+        {/* Catégories pour la création */}
+        <div className="mb-6">
+          <CategorySelector
+            onSelectionChange={handleSelectionChange}
+            initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
+          />
+        </div>
+
         {/* Créer une partie */}
         <div className="mb-6">
           <button
@@ -148,6 +182,9 @@ export default function MultiLobby() {
           >
             Rejoindre
           </button>
+          <p className="text-white/40 text-xs text-center">
+            Les catégories sont définies par l&apos;hôte de la partie
+          </p>
         </div>
       </div>
     </div>

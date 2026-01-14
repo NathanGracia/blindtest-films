@@ -12,9 +12,17 @@ const port = 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-// Charger les films
-const filmsPath = path.join(__dirname, 'data', 'films.json');
-const films = JSON.parse(fs.readFileSync(filmsPath, 'utf-8'));
+// Charger les tracks
+const tracksPath = path.join(__dirname, 'data', 'tracks.json');
+const categoriesPath = path.join(__dirname, 'data', 'categories.json');
+
+function loadTracks() {
+  return JSON.parse(fs.readFileSync(tracksPath, 'utf-8'));
+}
+
+function loadCategories() {
+  return JSON.parse(fs.readFileSync(categoriesPath, 'utf-8'));
+}
 
 // Stockage des rooms en mémoire
 const rooms = new Map();
@@ -57,6 +65,14 @@ function shuffleArray(array) {
   return shuffled;
 }
 
+// Filtrer les tracks par catégories
+function filterTracksByCategories(tracks, categoryIds) {
+  if (!categoryIds || categoryIds.length === 0) {
+    return tracks;
+  }
+  return tracks.filter(track => categoryIds.includes(track.categoryId));
+}
+
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
@@ -72,19 +88,35 @@ app.prepare().then(() => {
     let currentPseudo = null;
 
     // Créer une room
-    socket.on('room:create', (pseudo, callback) => {
+    socket.on('room:create', (pseudo, categories, callback) => {
+      // Support de l'ancienne API (sans catégories)
+      if (typeof categories === 'function') {
+        callback = categories;
+        categories = null;
+      }
+
       let code = generateRoomCode();
       while (rooms.has(code)) {
         code = generateRoomCode();
       }
 
+      // Charger et filtrer les tracks
+      const allTracks = loadTracks();
+      const filteredTracks = filterTracksByCategories(allTracks, categories);
+
+      if (filteredTracks.length === 0) {
+        callback(null, 'Aucune musique disponible pour les catégories sélectionnées');
+        return;
+      }
+
       const room = {
         code,
         players: [{ id: socket.id, pseudo, score: 0 }],
-        currentFilmIndex: 0,
+        currentTrackIndex: 0,
         isPlaying: false,
         hostId: socket.id,
-        films: shuffleArray(films),
+        tracks: shuffleArray(filteredTracks),
+        categories: categories || [],
         timer: null,
         timeRemaining: 30,
         roundFound: false,
@@ -96,7 +128,7 @@ app.prepare().then(() => {
       currentRoom = code;
       currentPseudo = pseudo;
 
-      console.log(`Room ${code} créée par ${pseudo}`);
+      console.log(`Room ${code} créée par ${pseudo} avec ${filteredTracks.length} tracks`);
       callback(code);
     });
 
@@ -160,18 +192,22 @@ app.prepare().then(() => {
         callback(null);
         return;
       }
+
+      const currentTrack = room.tracks[room.currentTrackIndex];
       callback({
         code: room.code,
         players: room.players,
-        currentFilmIndex: room.currentFilmIndex,
+        currentTrackIndex: room.currentTrackIndex,
         isPlaying: room.isPlaying,
         hostId: room.hostId,
         timeRemaining: room.timeRemaining,
-        currentFilm: room.isPlaying ? {
-          audioFile: room.films[room.currentFilmIndex].audioFile,
-          timeLimit: room.films[room.currentFilmIndex].timeLimit,
+        currentTrack: room.isPlaying && currentTrack ? {
+          audioFile: currentTrack.audioFile,
+          imageFile: currentTrack.imageFile,
+          timeLimit: currentTrack.timeLimit,
         } : null,
-        totalFilms: room.films.length,
+        totalTracks: room.tracks.length,
+        categories: room.categories,
       });
     });
 
@@ -181,24 +217,27 @@ app.prepare().then(() => {
       const room = rooms.get(currentRoom);
       if (!room || room.hostId !== socket.id) return;
 
-      // Reshuffle les films à chaque nouvelle partie
-      room.films = shuffleArray(films);
+      // Recharger et refiltrer les tracks
+      const allTracks = loadTracks();
+      const filteredTracks = filterTracksByCategories(allTracks, room.categories);
+      room.tracks = shuffleArray(filteredTracks);
 
       room.isPlaying = true;
-      room.currentFilmIndex = 0;
+      room.currentTrackIndex = 0;
       room.roundFound = false;
 
       // Reset scores
       room.players.forEach(p => p.score = 0);
 
-      const currentFilm = room.films[room.currentFilmIndex];
-      room.timeRemaining = currentFilm.timeLimit;
+      const currentTrack = room.tracks[room.currentTrackIndex];
+      room.timeRemaining = currentTrack.timeLimit;
 
       io.to(currentRoom).emit('game:start', {
-        filmIndex: room.currentFilmIndex,
-        audioFile: currentFilm.audioFile,
-        timeLimit: currentFilm.timeLimit,
-        totalFilms: room.films.length,
+        trackIndex: room.currentTrackIndex,
+        audioFile: currentTrack.audioFile,
+        imageFile: currentTrack.imageFile,
+        timeLimit: currentTrack.timeLimit,
+        totalTracks: room.tracks.length,
       });
 
       // Démarrer le timer
@@ -213,8 +252,8 @@ app.prepare().then(() => {
       const room = rooms.get(currentRoom);
       if (!room || !room.isPlaying || room.roundFound) return;
 
-      const currentFilm = room.films[room.currentFilmIndex];
-      const isCorrect = checkAnswer(answer, currentFilm.acceptedAnswers);
+      const currentTrack = room.tracks[room.currentTrackIndex];
+      const isCorrect = checkAnswer(answer, currentTrack.acceptedAnswers);
 
       // Broadcast la tentative à tous
       io.to(currentRoom).emit('chat:message', {
@@ -243,12 +282,13 @@ app.prepare().then(() => {
         io.to(currentRoom).emit('game:correct-answer', {
           playerId: socket.id,
           pseudo: currentPseudo,
-          title: currentFilm.title,
+          title: currentTrack.title,
+          imageFile: currentTrack.imageFile,
           players: room.players,
         });
 
-        // Passer au film suivant après 3 secondes
-        setTimeout(() => nextFilm(room, currentRoom, io), 3000);
+        // Passer au track suivant après 3 secondes
+        setTimeout(() => nextTrack(room, currentRoom, io), 3000);
       }
     });
 
@@ -347,24 +387,25 @@ app.prepare().then(() => {
         room.timer = null;
 
         if (!room.roundFound) {
-          const currentFilm = room.films[room.currentFilmIndex];
+          const currentTrack = room.tracks[room.currentTrackIndex];
           io.to(roomCode).emit('game:time-up', {
-            title: currentFilm.title,
+            title: currentTrack.title,
+            imageFile: currentTrack.imageFile,
           });
 
           // Passer au suivant après 3 secondes
-          setTimeout(() => nextFilm(room, roomCode, io), 3000);
+          setTimeout(() => nextTrack(room, roomCode, io), 3000);
         }
       }
     }, 1000);
   }
 
-  // Passer au film suivant
-  function nextFilm(room, roomCode, io) {
-    room.currentFilmIndex++;
+  // Passer au track suivant
+  function nextTrack(room, roomCode, io) {
+    room.currentTrackIndex++;
     room.roundFound = false;
 
-    if (room.currentFilmIndex >= room.films.length) {
+    if (room.currentTrackIndex >= room.tracks.length) {
       // Fin de partie
       room.isPlaying = false;
       io.to(roomCode).emit('game:end', {
@@ -373,14 +414,15 @@ app.prepare().then(() => {
       return;
     }
 
-    const currentFilm = room.films[room.currentFilmIndex];
-    room.timeRemaining = currentFilm.timeLimit;
+    const currentTrack = room.tracks[room.currentTrackIndex];
+    room.timeRemaining = currentTrack.timeLimit;
 
     io.to(roomCode).emit('game:next', {
-      filmIndex: room.currentFilmIndex,
-      audioFile: currentFilm.audioFile,
-      timeLimit: currentFilm.timeLimit,
-      totalFilms: room.films.length,
+      trackIndex: room.currentTrackIndex,
+      audioFile: currentTrack.audioFile,
+      imageFile: currentTrack.imageFile,
+      timeLimit: currentTrack.timeLimit,
+      totalTracks: room.tracks.length,
     });
 
     startTimer(room, roomCode, io);

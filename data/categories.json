@@ -1,0 +1,26 @@
+[
+  {
+    "id": "films",
+    "name": "Films",
+    "icon": "film",
+    "color": "#4a90d9"
+  },
+  {
+    "id": "series",
+    "name": "Séries",
+    "icon": "tv",
+    "color": "#7ec8e3"
+  },
+  {
+    "id": "jeux",
+    "name": "Jeux Vidéo",
+    "icon": "gamepad",
+    "color": "#7fba00"
+  },
+  {
+    "id": "anime",
+    "name": "Anime",
+    "icon": "sparkles",
+    "color": "#00b4d8"
+  }
+]

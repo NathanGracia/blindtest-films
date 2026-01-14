@@ -7,13 +7,13 @@ import Timer from '@/components/Timer';
 import AudioPlayer from '@/components/AudioPlayer';
 import AnswerInput from '@/components/AnswerInput';
 import ScoreBoard from '@/components/ScoreBoard';
-import { Film, Attempt } from '@/types';
+import RevealImage from '@/components/RevealImage';
+import { Track, Attempt } from '@/types';
 import { checkAnswer, shuffleArray } from '@/lib/utils';
-import filmsData from '@/data/films.json';
 
 export default function GamePage() {
   const router = useRouter();
-  const [films, setFilms] = useState<Film[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -22,38 +22,65 @@ export default function GamePage() {
   const [showResult, setShowResult] = useState(false);
   const [wasCorrect, setWasCorrect] = useState(false);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Initialiser le jeu
+  // Charger les tracks selon les catégories sélectionnées
   useEffect(() => {
-    const shuffled = shuffleArray(filmsData as Film[]);
-    setFilms(shuffled);
-    if (shuffled.length > 0) {
-      setTimeRemaining(shuffled[0].timeLimit);
-      setIsPlaying(true);
-    }
+    const loadTracks = async () => {
+      try {
+        // Récupérer les catégories sélectionnées
+        const savedCategories = sessionStorage.getItem('blindtest_categories');
+        let url = '/api/tracks';
+
+        if (savedCategories) {
+          const categories = JSON.parse(savedCategories);
+          if (categories.length > 0) {
+            url += `?categories=${categories.join(',')}`;
+          }
+        }
+
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const shuffled = shuffleArray(data as Track[]);
+          setTracks(shuffled);
+
+          if (shuffled.length > 0) {
+            setTimeRemaining(shuffled[0].timeLimit);
+            setIsPlaying(true);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement tracks:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTracks();
   }, []);
 
-  const currentFilm = films[currentIndex];
+  const currentTrack = tracks[currentIndex];
 
-  // Passer au film suivant
-  const nextFilm = useCallback(() => {
+  // Passer au track suivant
+  const nextTrack = useCallback(() => {
     setShowResult(false);
     setAttempts([]);
 
-    if (currentIndex + 1 >= films.length) {
+    if (currentIndex + 1 >= tracks.length) {
       setIsFinished(true);
       setIsPlaying(false);
     } else {
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
-      setTimeRemaining(films[nextIndex].timeLimit);
+      setTimeRemaining(tracks[nextIndex].timeLimit);
       setIsPlaying(true);
     }
-  }, [currentIndex, films]);
+  }, [currentIndex, tracks]);
 
   // Gérer le timer
   useEffect(() => {
-    if (!isPlaying || showResult || !currentFilm) return;
+    if (!isPlaying || showResult || !currentTrack) return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -68,13 +95,13 @@ export default function GamePage() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, showResult, currentFilm]);
+  }, [isPlaying, showResult, currentTrack]);
 
   // Soumettre une réponse
   const handleSubmit = (answer: string) => {
-    if (!currentFilm || showResult) return;
+    if (!currentTrack || showResult) return;
 
-    const isCorrect = checkAnswer(answer, currentFilm.acceptedAnswers);
+    const isCorrect = checkAnswer(answer, currentTrack.acceptedAnswers);
 
     setAttempts((prev) => [
       ...prev,
@@ -100,7 +127,7 @@ export default function GamePage() {
           <h1 className="text-3xl font-bold text-white mb-4 text-glow">Partie terminée !</h1>
           <div className="text-6xl font-bold text-[#7fba00] mb-2 text-glow">{score}</div>
           <p className="text-white/60 mb-8">
-            sur {films.length} film{films.length > 1 ? 's' : ''}
+            sur {tracks.length} musique{tracks.length > 1 ? 's' : ''}
           </p>
           <div className="space-y-3">
             <button
@@ -122,7 +149,7 @@ export default function GamePage() {
   }
 
   // Chargement
-  if (films.length === 0 || !currentFilm) {
+  if (loading) {
     return (
       <div className="min-h-screen aero-bg flex items-center justify-center">
         <div className="glass rounded-xl px-8 py-4">
@@ -133,6 +160,33 @@ export default function GamePage() {
         </div>
       </div>
     );
+  }
+
+  // Pas de tracks disponibles
+  if (tracks.length === 0) {
+    return (
+      <div className="min-h-screen aero-bg flex items-center justify-center p-4">
+        <div className="glass rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#4a90d9]/20 flex items-center justify-center">
+            <span className="text-4xl">🎵</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-4">Aucune musique disponible</h1>
+          <p className="text-white/60 mb-6">
+            Il n&apos;y a pas de musiques dans les catégories sélectionnées.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="btn-aero w-full px-6 py-3 text-white rounded-xl"
+          >
+            🏠 Retour à l&apos;accueil
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentTrack) {
+    return null;
   }
 
   return (
@@ -152,15 +206,15 @@ export default function GamePage() {
         <ScoreBoard
           score={score}
           currentIndex={currentIndex}
-          total={films.length}
+          total={tracks.length}
         />
 
         {/* Timer */}
-        <Timer timeRemaining={timeRemaining} totalTime={currentFilm.timeLimit} />
+        <Timer timeRemaining={timeRemaining} totalTime={currentTrack.timeLimit} />
 
         {/* Audio Player */}
         <div className="flex justify-center py-6">
-          <AudioPlayer src={currentFilm.audioFile} isPlaying={isPlaying} />
+          <AudioPlayer src={currentTrack.audioFile} isPlaying={isPlaying} />
         </div>
 
         {/* Résultat */}
@@ -173,14 +227,26 @@ export default function GamePage() {
             <p className={`text-xl font-semibold ${wasCorrect ? 'text-[#7fba00]' : 'text-red-400'}`}>
               {wasCorrect ? '✓ Bravo !' : '✗ Temps écoulé !'}
             </p>
+
+            {/* Image de révélation */}
+            {currentTrack.imageFile && (
+              <div className="my-4 flex justify-center">
+                <RevealImage
+                  src={currentTrack.imageFile}
+                  alt={currentTrack.title}
+                  className="max-w-xs"
+                />
+              </div>
+            )}
+
             <p className="text-3xl font-bold text-white mt-3 text-glow">
-              {currentFilm.title}
+              {currentTrack.title}
             </p>
             <button
-              onClick={nextFilm}
+              onClick={nextTrack}
               className="btn-aero mt-6 px-8 py-3 text-white rounded-xl font-semibold"
             >
-              {currentIndex + 1 >= films.length ? '📊 Voir le score' : '➡️ Film suivant'}
+              {currentIndex + 1 >= tracks.length ? '📊 Voir le score' : '➡️ Musique suivante'}
             </button>
           </div>
         )}

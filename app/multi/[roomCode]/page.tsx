@@ -6,6 +6,7 @@ import { getSocket } from '@/lib/socket';
 import Timer from '@/components/Timer';
 import AudioPlayer from '@/components/AudioPlayer';
 import PlayerList from '@/components/PlayerList';
+import RevealImage from '@/components/RevealImage';
 import { Player, ChatMessage, RoomState } from '@/types';
 
 export default function MultiGameRoom() {
@@ -20,6 +21,7 @@ export default function MultiGameRoom() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [resultTitle, setResultTitle] = useState('');
+  const [resultImage, setResultImage] = useState<string | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
@@ -42,7 +44,7 @@ export default function MultiGameRoom() {
 
     // Try to rejoin the room if we have a stored pseudo (handles reconnects / navigation)
     const storedPseudo = (() => {
-      try { return sessionStorage.getItem('blindtest_pseudo'); } catch (e) { return null; }
+      try { return sessionStorage.getItem('blindtest_pseudo'); } catch { return null; }
     })();
 
     if (!storedPseudo) {
@@ -51,11 +53,11 @@ export default function MultiGameRoom() {
     } else {
       // If this client just created the room, skip the explicit join (server already added the creator)
       const justCreatedRoom = (() => {
-        try { return sessionStorage.getItem('blindtest_created_room'); } catch (e) { return null; }
+        try { return sessionStorage.getItem('blindtest_created_room'); } catch { return null; }
       })();
 
       if (justCreatedRoom === roomCode) {
-        try { sessionStorage.removeItem('blindtest_created_room'); } catch (e) {}
+        try { sessionStorage.removeItem('blindtest_created_room'); } catch {}
 
         // Request the room state directly
         socket.emit('room:state', (state: RoomState | null) => {
@@ -64,14 +66,10 @@ export default function MultiGameRoom() {
             return;
           }
           setRoom(state);
-          if (state.isPlaying && state.currentFilm) {
+          if (state.isPlaying && state.currentTrack) {
             setIsPlaying(true);
             setTimeRemaining(state.timeRemaining);
           }
-
-          // Set currentRoom/currentPseudo for this socket instance
-          let currentRoom = roomCode;
-          let currentPseudo = storedPseudo;
         });
       } else {
         console.log('[multi-room] attempting join with pseudo', storedPseudo);
@@ -83,7 +81,7 @@ export default function MultiGameRoom() {
           }
 
           // Persist final pseudo (server may have modified it)
-          try { sessionStorage.setItem('blindtest_pseudo', finalPseudo || storedPseudo); } catch (e) {}
+          try { sessionStorage.setItem('blindtest_pseudo', finalPseudo || storedPseudo); } catch {}
 
           // Now request the room state
           socket.emit('room:state', (state: RoomState | null) => {
@@ -92,7 +90,7 @@ export default function MultiGameRoom() {
               return;
             }
             setRoom(state);
-            if (state.isPlaying && state.currentFilm) {
+            if (state.isPlaying && state.currentTrack) {
               setIsPlaying(true);
               setTimeRemaining(state.timeRemaining);
             }
@@ -122,15 +120,15 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:start', (data: { filmIndex: number; audioFile: string; timeLimit: number; totalFilms: number }) => {
+    socket.on('game:start', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; totalTracks: number }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           isPlaying: true,
-          currentFilmIndex: data.filmIndex,
-          currentFilm: { audioFile: data.audioFile, timeLimit: data.timeLimit },
-          totalFilms: data.totalFilms,
+          currentTrackIndex: data.trackIndex,
+          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit },
+          totalTracks: data.totalTracks,
           players: prev.players.map((p) => ({ ...p, score: 0 })),
         };
       });
@@ -139,6 +137,7 @@ export default function MultiGameRoom() {
       setMessages([]);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
+      setResultImage(null);
       setIsFinished(false);
     });
 
@@ -150,9 +149,10 @@ export default function MultiGameRoom() {
       setMessages((prev) => [...prev, msg]);
     });
 
-    socket.on('game:correct-answer', (data: { playerId: string; pseudo: string; title: string; players: Player[] }) => {
+    socket.on('game:correct-answer', (data: { playerId: string; pseudo: string; title: string; imageFile?: string; players: Player[] }) => {
       setShowResult(true);
       setResultTitle(data.title);
+      setResultImage(data.imageFile || null);
       setWinnerId(data.playerId);
       setWinnerPseudo(data.pseudo);
       setIsPlaying(false);
@@ -162,28 +162,30 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:time-up', (data: { title: string }) => {
+    socket.on('game:time-up', (data: { title: string; imageFile?: string }) => {
       setShowResult(true);
       setResultTitle(data.title);
+      setResultImage(data.imageFile || null);
       setWinnerId(null);
       setWinnerPseudo(null);
       setIsPlaying(false);
     });
 
-    socket.on('game:next', (data: { filmIndex: number; audioFile: string; timeLimit: number; totalFilms: number }) => {
+    socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; totalTracks: number }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          currentFilmIndex: data.filmIndex,
-          currentFilm: { audioFile: data.audioFile, timeLimit: data.timeLimit },
-          totalFilms: data.totalFilms,
+          currentTrackIndex: data.trackIndex,
+          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit },
+          totalTracks: data.totalTracks,
         };
       });
       setShowResult(false);
       setMessages([]);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
+      setResultImage(null);
       setIsPlaying(true);
     });
 
@@ -210,7 +212,7 @@ export default function MultiGameRoom() {
       socket.off('game:next');
       socket.off('game:end');
     };
-  }, [router]);
+  }, [router, roomCode]);
 
   useEffect(() => {
     if (chatRef.current) {
@@ -227,7 +229,7 @@ export default function MultiGameRoom() {
   const handleLeave = () => {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
     socketRef.current.emit('room:leave');
-    try { sessionStorage.removeItem('blindtest_pseudo'); } catch (e) {}
+    try { sessionStorage.removeItem('blindtest_pseudo'); } catch {}
     router.push('/multi');
   };
 
@@ -305,7 +307,7 @@ export default function MultiGameRoom() {
   }
 
   // Salle d'attente
-  if (!room.isPlaying && !room.currentFilm) {
+  if (!room.isPlaying && !room.currentTrack) {
     return (
       <div className="min-h-screen aero-bg p-4">
         <div className="max-w-md mx-auto space-y-6">
@@ -376,7 +378,7 @@ export default function MultiGameRoom() {
             {/* Info partie */}
             <div className="flex justify-between items-center glass rounded-xl p-3">
               <span className="text-white/60">
-                Film {(room.currentFilmIndex || 0) + 1} / {room.totalFilms}
+                Musique {(room.currentTrackIndex || 0) + 1} / {room.totalTracks}
               </span>
               <code className="text-[#7ec8e3] font-mono tracking-wider">{roomCode}</code>
             </div>
@@ -384,13 +386,13 @@ export default function MultiGameRoom() {
             {/* Timer */}
             <Timer
               timeRemaining={timeRemaining}
-              totalTime={room.currentFilm?.timeLimit || 30}
+              totalTime={room.currentTrack?.timeLimit || 30}
             />
 
             {/* Audio */}
             <div className="flex justify-center py-4">
               <AudioPlayer
-                src={room.currentFilm?.audioFile || ''}
+                src={room.currentTrack?.audioFile || ''}
                 isPlaying={isPlaying}
               />
             </div>
@@ -405,6 +407,18 @@ export default function MultiGameRoom() {
                 <p className={`text-xl font-semibold ${winnerId ? 'text-[#7fba00]' : 'text-red-400'}`}>
                   {winnerId ? `✓ ${winnerPseudo} a trouvé !` : '✗ Temps écoulé !'}
                 </p>
+
+                {/* Image de révélation */}
+                {resultImage && (
+                  <div className="my-4 flex justify-center">
+                    <RevealImage
+                      src={resultImage}
+                      alt={resultTitle}
+                      className="max-w-xs"
+                    />
+                  </div>
+                )}
+
                 <p className="text-3xl font-bold text-white mt-3 text-glow">{resultTitle}</p>
               </div>
             )}
@@ -453,7 +467,7 @@ export default function MultiGameRoom() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={!isPlaying || showResult}
-                  placeholder={isPlaying ? 'Quel est ce film ?' : 'En attente...'}
+                  placeholder={isPlaying ? 'Devine la musique...' : 'En attente...'}
                   className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
                   autoComplete="off"
                 />

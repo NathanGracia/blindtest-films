@@ -1,10 +1,24 @@
-export interface Film {
+// Types pour les catégories
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+// Types pour les musiques (anciennement Film)
+export interface Track {
   id: number;
   title: string;
   acceptedAnswers: string[];
   audioFile: string;
+  imageFile: string | null;
+  categoryId: string;
   timeLimit: number;
 }
+
+// Alias pour compatibilité (à supprimer progressivement)
+export type Film = Track;
 
 export interface GameState {
   currentIndex: number;
@@ -32,15 +46,17 @@ export interface Player {
 export interface RoomState {
   code: string;
   players: Player[];
-  currentFilmIndex: number;
+  currentTrackIndex: number;
   isPlaying: boolean;
   hostId: string;
   timeRemaining: number;
-  currentFilm: {
+  currentTrack: {
     audioFile: string;
+    imageFile: string | null;
     timeLimit: number;
   } | null;
-  totalFilms: number;
+  totalTracks: number;
+  categories: string[];
 }
 
 export interface ChatMessage {
@@ -48,4 +64,10 @@ export interface ChatMessage {
   message: string;
   isCorrect: boolean;
   playerId: string;
+}
+
+// Types Admin
+export interface AdminSession {
+  authenticated: boolean;
+  expiresAt: number;
 }

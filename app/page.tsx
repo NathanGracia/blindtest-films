@@ -1,9 +1,32 @@
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import CategorySelector from '@/components/CategorySelector';
 
 export default function Home() {
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  // Charger la sélection sauvegardée
+  useEffect(() => {
+    const saved = sessionStorage.getItem('blindtest_categories');
+    if (saved) {
+      try {
+        setSelectedCategories(JSON.parse(saved));
+      } catch {
+        // Ignorer les erreurs de parsing
+      }
+    }
+  }, []);
+
+  const handleSelectionChange = useCallback((selected: string[]) => {
+    setSelectedCategories(selected);
+    sessionStorage.setItem('blindtest_categories', JSON.stringify(selected));
+  }, []);
+
   return (
     <div className="min-h-screen aero-bg flex items-center justify-center p-4">
-      <div className="text-center max-w-lg">
+      <div className="text-center max-w-lg w-full">
         {/* Logo / Title */}
         <div className="mb-8">
           <div className="glass rounded-full w-32 h-32 mx-auto mb-6 flex items-center justify-center glow-blue">
@@ -18,6 +41,14 @@ export default function Home() {
           <p className="text-white/70 text-lg mt-4">
             Devine les films à partir de leurs musiques emblématiques !
           </p>
+        </div>
+
+        {/* Category Selector */}
+        <div className="mb-6">
+          <CategorySelector
+            onSelectionChange={handleSelectionChange}
+            initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
+          />
         </div>
 
         {/* Buttons */}
@@ -36,8 +67,18 @@ export default function Home() {
           </Link>
         </div>
 
+        {/* Admin Link */}
+        <div className="mt-6">
+          <Link
+            href="/admin"
+            className="text-white/30 hover:text-white/60 text-sm transition-colors"
+          >
+            Administration
+          </Link>
+        </div>
+
         {/* How to play */}
-        <div className="mt-12 glass rounded-xl p-6">
+        <div className="mt-8 glass rounded-xl p-6">
           <h3 className="font-semibold text-[#7ec8e3] mb-4 text-lg">
             Comment jouer ?
           </h3>
