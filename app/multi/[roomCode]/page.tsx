@@ -26,6 +26,7 @@ export default function MultiGameRoom() {
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [finalScores, setFinalScores] = useState<Player[]>([]);
+  const [publicCountdown, setPublicCountdown] = useState<number | null>(null);
 
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,10 @@ export default function MultiGameRoom() {
             setIsPlaying(true);
             setTimeRemaining(state.timeRemaining);
           }
+          // Si room publique avec countdown en cours
+          if (state.isPublic && state.isCountingDown && state.startCountdownValue) {
+            setPublicCountdown(state.startCountdownValue);
+          }
         });
       } else {
         console.log('[multi-room] attempting join with pseudo', storedPseudo);
@@ -93,6 +98,10 @@ export default function MultiGameRoom() {
             if (state.isPlaying && state.currentTrack) {
               setIsPlaying(true);
               setTimeRemaining(state.timeRemaining);
+            }
+            // Si room publique avec countdown en cours
+            if (state.isPublic && state.isCountingDown && state.startCountdownValue) {
+              setPublicCountdown(state.startCountdownValue);
             }
           });
         });
@@ -120,14 +129,14 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:start', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; totalTracks: number }) => {
+    socket.on('game:start', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           isPlaying: true,
           currentTrackIndex: data.trackIndex,
-          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit },
+          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
           totalTracks: data.totalTracks,
           players: prev.players.map((p) => ({ ...p, score: 0 })),
         };
@@ -171,13 +180,13 @@ export default function MultiGameRoom() {
       setIsPlaying(false);
     });
 
-    socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; totalTracks: number }) => {
+    socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           currentTrackIndex: data.trackIndex,
-          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit },
+          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
           totalTracks: data.totalTracks,
         };
       });
@@ -196,6 +205,14 @@ export default function MultiGameRoom() {
       setShowResult(false);
     });
 
+    // Countdown de la room publique
+    socket.on('public:countdown', (countdown: number) => {
+      setPublicCountdown(countdown);
+      if (countdown <= 0) {
+        setPublicCountdown(null);
+      }
+    });
+
     return () => {
       // Emit leave when the component unmounts so server state is cleaned up
       socket.emit('room:leave');
@@ -211,6 +228,7 @@ export default function MultiGameRoom() {
       socket.off('game:time-up');
       socket.off('game:next');
       socket.off('game:end');
+      socket.off('public:countdown');
     };
   }, [router, roomCode]);
 
@@ -258,8 +276,8 @@ export default function MultiGameRoom() {
     );
   }
 
-  // Écran de fin
-  if (isFinished) {
+  // Écran de fin (uniquement pour les rooms privées)
+  if (isFinished && !room.isPublic) {
     return (
       <div className="min-h-screen aero-bg flex items-center justify-center p-4">
         <div className="glass rounded-2xl p-8 max-w-md w-full text-center">
@@ -312,22 +330,33 @@ export default function MultiGameRoom() {
       <div className="min-h-screen aero-bg p-4">
         <div className="max-w-md mx-auto space-y-6">
           <div className="glass rounded-2xl p-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Room</h1>
-            <div className="flex items-center gap-3">
-              <code className="text-4xl font-mono text-[#7ec8e3] tracking-[0.2em] text-glow">
-                {roomCode}
-              </code>
-              <button
-                onClick={() => navigator.clipboard.writeText(roomCode)}
-                className="glass p-2 rounded-lg text-white/60 hover:text-white transition-colors cursor-pointer"
-                title="Copier le code"
-              >
-                📋
-              </button>
-            </div>
-            <p className="text-white/50 text-sm mt-3">
-              Partage ce code pour inviter des amis
-            </p>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              {room.isPublic ? 'Partie Publique' : 'Room'}
+            </h1>
+            {!room.isPublic && (
+              <>
+                <div className="flex items-center gap-3">
+                  <code className="text-4xl font-mono text-[#7ec8e3] tracking-[0.2em] text-glow">
+                    {roomCode}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(roomCode)}
+                    className="glass p-2 rounded-lg text-white/60 hover:text-white transition-colors cursor-pointer"
+                    title="Copier le code"
+                  >
+                    📋
+                  </button>
+                </div>
+                <p className="text-white/50 text-sm mt-3">
+                  Partage ce code pour inviter des amis
+                </p>
+              </>
+            )}
+            {room.isPublic && (
+              <p className="text-white/50 text-sm mt-2">
+                Toutes les musiques • Partie en boucle
+              </p>
+            )}
           </div>
 
           <PlayerList
@@ -337,7 +366,25 @@ export default function MultiGameRoom() {
           />
 
           <div className="mt-6">
-            {room.hostId === myId ? (
+            {room.isPublic ? (
+              // Affichage du countdown pour la room publique
+              <div className="glass rounded-xl p-6 text-center">
+                {publicCountdown !== null ? (
+                  <>
+                    <p className="text-white/60 mb-2">La partie commence dans</p>
+                    <div className="text-6xl font-bold text-[#7ec8e3] text-glow">
+                      {publicCountdown}
+                    </div>
+                    <p className="text-white/40 text-sm mt-2">secondes</p>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 text-white/60">
+                    <div className="w-4 h-4 border-2 border-[#7ec8e3] border-t-transparent rounded-full animate-spin" />
+                    En attente de joueurs...
+                  </div>
+                )}
+              </div>
+            ) : room.hostId === myId ? (
               <button
                 onClick={handleStartGame}
                 disabled={room.players.length < 1}
@@ -380,7 +427,11 @@ export default function MultiGameRoom() {
               <span className="text-white/60">
                 Musique {(room.currentTrackIndex || 0) + 1} / {room.totalTracks}
               </span>
-              <code className="text-[#7ec8e3] font-mono tracking-wider">{roomCode}</code>
+              {room.isPublic ? (
+                <span className="text-[#7ec8e3] font-semibold">🌍 Partie Publique</span>
+              ) : (
+                <code className="text-[#7ec8e3] font-mono tracking-wider">{roomCode}</code>
+              )}
             </div>
 
             {/* Timer */}
@@ -394,6 +445,7 @@ export default function MultiGameRoom() {
               <AudioPlayer
                 src={room.currentTrack?.audioFile || ''}
                 isPlaying={isPlaying}
+                startTime={room.currentTrack?.startTime || 0}
               />
             </div>
 

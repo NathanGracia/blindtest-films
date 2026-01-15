@@ -5,15 +5,17 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 interface AudioPlayerProps {
   src: string;
   isPlaying: boolean;
+  startTime?: number;
   onError?: () => void;
 }
 
-export default function AudioPlayer({ src, isPlaying, onError }: AudioPlayerProps) {
+export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const prevSrcRef = useRef<string>('');
+  const hasSetStartTime = useRef(false);
 
   // Reset state when src changes
   useEffect(() => {
@@ -22,43 +24,51 @@ export default function AudioPlayer({ src, isPlaying, onError }: AudioPlayerProp
       setHasError(false);
       setIsReady(false);
       setIsLoading(true);
+      hasSetStartTime.current = false;
 
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+        audioRef.current.currentTime = startTime;
         audioRef.current.load();
       }
     }
-  }, [src]);
+  }, [src, startTime]);
 
   // Handle play/pause
   useEffect(() => {
     if (!audioRef.current || hasError) return;
 
     if (isPlaying && isReady) {
-      audioRef.current.play().catch((err) => {
-        console.error('Play error:', err);
+      // Set startTime before playing if not already set
+      if (!hasSetStartTime.current) {
+        audioRef.current.currentTime = startTime;
+        hasSetStartTime.current = true;
+      }
+      audioRef.current.play().catch(() => {
         setHasError(true);
         onError?.();
       });
     } else {
       audioRef.current.pause();
     }
-  }, [isPlaying, isReady, hasError, onError]);
+  }, [isPlaying, isReady, hasError, onError, startTime]);
 
   const handleCanPlay = useCallback(() => {
     setIsReady(true);
     setHasError(false);
     setIsLoading(false);
-  }, []);
+    // Set initial position to startTime when ready
+    if (audioRef.current && !hasSetStartTime.current) {
+      audioRef.current.currentTime = startTime;
+    }
+  }, [startTime]);
 
   const handleError = useCallback(() => {
-    console.error('Audio error for:', src);
     setHasError(true);
     setIsReady(false);
     setIsLoading(false);
     onError?.();
-  }, [src, onError]);
+  }, [onError]);
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -129,11 +139,10 @@ export default function AudioPlayer({ src, isPlaying, onError }: AudioPlayerProp
         )}
       </div>
 
-      {/* File path display (only show on error) */}
+      {/* Error message (without filename to avoid spoilers) */}
       {hasError && (
         <div className="text-center glass rounded-lg px-4 py-2">
-          <p className="text-red-400 text-sm">Fichier audio introuvable</p>
-          <code className="text-red-300 text-xs">{src}</code>
+          <p className="text-red-400 text-sm">Erreur de chargement audio</p>
         </div>
       )}
 

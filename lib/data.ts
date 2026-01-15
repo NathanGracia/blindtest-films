@@ -10,6 +10,7 @@ function toTrack(dbTrack: {
   imageFile: string | null;
   categoryId: string;
   timeLimit: number;
+  startTime: number;
 }): Track {
   return {
     ...dbTrack,
@@ -57,6 +58,7 @@ export async function addTrack(track: Omit<Track, 'id'>): Promise<Track> {
       imageFile: track.imageFile,
       categoryId: track.categoryId,
       timeLimit: track.timeLimit,
+      startTime: track.startTime || 0,
     },
   });
   return toTrack(newTrack);
@@ -73,6 +75,7 @@ export async function updateTrack(id: number, updates: Partial<Track>): Promise<
     if (updates.imageFile !== undefined) data.imageFile = updates.imageFile;
     if (updates.categoryId !== undefined) data.categoryId = updates.categoryId;
     if (updates.timeLimit !== undefined) data.timeLimit = updates.timeLimit;
+    if (updates.startTime !== undefined) data.startTime = updates.startTime;
 
     const track = await prisma.track.update({
       where: { id },

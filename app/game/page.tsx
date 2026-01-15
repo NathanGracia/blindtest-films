@@ -214,7 +214,11 @@ export default function GamePage() {
 
         {/* Audio Player */}
         <div className="flex justify-center py-6">
-          <AudioPlayer src={currentTrack.audioFile} isPlaying={isPlaying} />
+          <AudioPlayer
+            src={currentTrack.audioFile}
+            isPlaying={isPlaying}
+            startTime={currentTrack.startTime || 0}
+          />
         </div>
 
         {/* Résultat */}

@@ -15,6 +15,7 @@ export interface Track {
   imageFile: string | null;
   categoryId: string;
   timeLimit: number;
+  startTime: number; // Seconde de départ de la musique
 }
 
 // Alias pour compatibilité (à supprimer progressivement)
@@ -48,15 +49,19 @@ export interface RoomState {
   players: Player[];
   currentTrackIndex: number;
   isPlaying: boolean;
-  hostId: string;
+  hostId: string | null;
   timeRemaining: number;
   currentTrack: {
     audioFile: string;
     imageFile: string | null;
     timeLimit: number;
+    startTime: number;
   } | null;
   totalTracks: number;
   categories: string[];
+  isPublic?: boolean;
+  startCountdownValue?: number | null;
+  isCountingDown?: boolean;
 }
 
 export interface ChatMessage {

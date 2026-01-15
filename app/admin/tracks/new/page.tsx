@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Category } from '@/types';
@@ -16,8 +16,15 @@ export default function NewTrackPage() {
   const [audioFile, setAudioFile] = useState('');
   const [imageFile, setImageFile] = useState('');
   const [timeLimit, setTimeLimit] = useState(30);
+  const [startTime, setStartTime] = useState(0);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Audio preview
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -32,6 +39,70 @@ export default function NewTrackPage() {
     };
     loadCategories();
   }, []);
+
+  // Gestion de l'audio
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleLoadedMetadata = () => {
+      setAudioDuration(audio.duration);
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [audioFile]);
+
+  // Reset startTime quand l'audio change
+  useEffect(() => {
+    setStartTime(0);
+    setAudioDuration(0);
+  }, [audioFile]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const playFromStartTime = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.currentTime = startTime;
+    audio.play();
+    setIsPlaying(true);
+  };
+
+  const pauseAudio = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    setIsPlaying(false);
+  };
+
+  const handleStartTimeChange = (newTime: number) => {
+    setStartTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -67,6 +138,7 @@ export default function NewTrackPage() {
           audioFile,
           imageFile: imageFile || null,
           timeLimit,
+          startTime,
         }),
       });
 
@@ -170,6 +242,83 @@ export default function NewTrackPage() {
             currentFile={audioFile}
             onUpload={setAudioFile}
           />
+
+          {/* Preview audio avec startTime */}
+          {audioFile && (
+            <div className="space-y-4 pt-4 border-t border-white/10">
+              <h4 className="text-md font-semibold text-[#7ec8e3]">Point de départ</h4>
+
+              <audio ref={audioRef} src={audioFile} preload="metadata" />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm text-white/60">
+                  <span>Début: {formatTime(startTime)}</span>
+                  <span>Durée totale: {formatTime(audioDuration)}</span>
+                </div>
+
+                {/* Slider pour le startTime */}
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(audioDuration - 1, 0)}
+                  step={0.1}
+                  value={startTime}
+                  onChange={(e) => handleStartTimeChange(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[#7ec8e3]"
+                />
+
+                {/* Input numérique pour plus de précision */}
+                <div className="flex items-center gap-3">
+                  <label className="text-white/60 text-sm">Seconde de départ:</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={Math.max(audioDuration - 1, 0)}
+                    step={0.1}
+                    value={startTime}
+                    onChange={(e) => handleStartTimeChange(parseFloat(e.target.value) || 0)}
+                    className="input-aero w-24 px-3 py-2 text-white rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Boutons de contrôle */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={isPlaying ? pauseAudio : playFromStartTime}
+                  className="btn-aero px-4 py-2 text-white rounded-lg flex items-center gap-2"
+                >
+                  {isPlaying ? (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                      </svg>
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      Tester depuis ce point
+                    </>
+                  )}
+                </button>
+
+                {isPlaying && (
+                  <span className="text-white/60 text-sm">
+                    {formatTime(currentTime)} / {formatTime(audioDuration)}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-white/40 text-xs">
+                Définissez le moment où la musique commencera pendant le jeu. Utile pour démarrer directement au drop ou au refrain.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="glass rounded-xl p-6 space-y-6">

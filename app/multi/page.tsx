@@ -90,6 +90,27 @@ export default function MultiLobby() {
     });
   };
 
+  const handleJoinPublic = () => {
+    if (!pseudo.trim()) {
+      setError('Entre un pseudo');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    const socket = getSocket();
+    socket.emit('room:join', 'PUBLIC', pseudo.trim(), (success: boolean, errorMsg?: string, finalPseudo?: string) => {
+      if (success) {
+        sessionStorage.setItem('blindtest_pseudo', finalPseudo || pseudo.trim());
+        router.push('/multi/PUBLIC');
+      } else {
+        setError(errorMsg || 'Impossible de rejoindre la partie publique');
+        setIsLoading(false);
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen aero-bg flex items-center justify-center p-4">
       <div className="glass rounded-2xl p-8 max-w-md w-full">
@@ -135,7 +156,37 @@ export default function MultiLobby() {
           />
         </div>
 
-        {/* Créer une partie */}
+        {/* Partie publique */}
+        <div className="mb-6">
+          <button
+            onClick={handleJoinPublic}
+            disabled={isLoading}
+            className="btn-aero w-full px-6 py-4 text-white text-lg font-semibold rounded-xl disabled:opacity-50 border-2 border-[#7ec8e3]/50"
+          >
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Connexion...
+              </span>
+            ) : (
+              '🌍 Rejoindre la partie publique'
+            )}
+          </button>
+          <p className="text-white/40 text-xs text-center mt-2">
+            Toutes les musiques • Joueurs aléatoires
+          </p>
+        </div>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/20"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-transparent text-white/50">ou créer une partie privée</span>
+          </div>
+        </div>
+
+        {/* Créer une partie privée */}
         <div className="mb-6">
           <button
             onClick={handleCreate}
@@ -148,7 +199,7 @@ export default function MultiLobby() {
                 Création...
               </span>
             ) : (
-              '🎮 Créer une partie'
+              '🎮 Créer une partie privée'
             )}
           </button>
         </div>
@@ -158,7 +209,7 @@ export default function MultiLobby() {
             <div className="w-full border-t border-white/20"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-transparent text-white/50">ou</span>
+            <span className="px-4 bg-transparent text-white/50">ou rejoindre</span>
           </div>
         </div>
 

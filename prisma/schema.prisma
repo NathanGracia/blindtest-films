@@ -22,6 +22,7 @@ model Track {
   audioFile       String
   imageFile       String?
   timeLimit       Int      @default(30)
+  startTime       Int      @default(0)  // Seconde de départ de la musique
   categoryId      String
   category        Category @relation(fields: [categoryId], references: [id])
 }

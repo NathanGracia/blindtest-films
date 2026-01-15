@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit } = body;
+    const { title, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit, startTime } = body;
 
     if (!title || !acceptedAnswers || !audioFile || !categoryId) {
       return NextResponse.json(
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       imageFile: imageFile || null,
       categoryId,
       timeLimit: timeLimit || 30,
+      startTime: startTime || 0,
     });
 
     return NextResponse.json(track, { status: 201 });

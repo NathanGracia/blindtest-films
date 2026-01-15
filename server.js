@@ -14,6 +14,9 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 const prisma = new PrismaClient();
 
+// Code de la room publique permanente
+const PUBLIC_ROOM_CODE = 'PUBLIC';
+
 // Charger les tracks depuis la base de données
 async function loadTracks() {
   const tracks = await prisma.track.findMany();
@@ -25,6 +28,34 @@ async function loadTracks() {
 
 // Stockage des rooms en mémoire
 const rooms = new Map();
+
+// Créer la room publique permanente
+async function createPublicRoom() {
+  try {
+    const allTracks = await loadTracks();
+    const publicRoom = {
+      code: PUBLIC_ROOM_CODE,
+      players: [],
+      currentTrackIndex: 0,
+      isPlaying: false,
+      hostId: null, // Pas de host pour la room publique
+      tracks: shuffleArray(allTracks),
+      categories: [], // Toutes les catégories
+      timer: null,
+      timeRemaining: 30,
+      roundFound: false,
+      deletionTimer: null,
+      isPublic: true,
+      startCountdown: null,
+      startCountdownValue: 30,
+    };
+    rooms.set(PUBLIC_ROOM_CODE, publicRoom);
+    console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${allTracks.length} tracks`);
+    return publicRoom;
+  } catch (error) {
+    console.error('Erreur création room publique:', error);
+  }
+}
 
 // Générer un code de room aléatoire
 function generateRoomCode() {
@@ -72,13 +103,159 @@ function filterTracksByCategories(tracks, categoryIds) {
   return tracks.filter(track => categoryIds.includes(track.categoryId));
 }
 
-app.prepare().then(() => {
+// Variable pour stocker io globalement (nécessaire pour les fonctions de la room publique)
+let ioInstance = null;
+
+// Démarrer le countdown de la room publique
+function startPublicRoomCountdown(room) {
+  if (room.startCountdown) return; // Déjà en cours
+
+  room.startCountdownValue = 30;
+  console.log(`Countdown room publique démarré`);
+
+  room.startCountdown = setInterval(async () => {
+    room.startCountdownValue--;
+
+    if (ioInstance) {
+      ioInstance.to(PUBLIC_ROOM_CODE).emit('public:countdown', room.startCountdownValue);
+    }
+
+    if (room.startCountdownValue <= 0) {
+      clearInterval(room.startCountdown);
+      room.startCountdown = null;
+      await startPublicGame(room);
+    }
+  }, 1000);
+}
+
+// Arrêter le countdown de la room publique
+function stopPublicRoomCountdown(room) {
+  if (room.startCountdown) {
+    clearInterval(room.startCountdown);
+    room.startCountdown = null;
+    room.startCountdownValue = 30;
+    console.log(`Countdown room publique arrêté`);
+  }
+}
+
+// Démarrer la partie de la room publique
+async function startPublicGame(room) {
+  if (!ioInstance) return;
+
+  try {
+    const allTracks = await loadTracks();
+    room.tracks = shuffleArray(allTracks);
+    room.currentTrackIndex = 0;
+    room.isPlaying = true;
+    room.roundFound = false;
+
+    // Reset scores de tous les joueurs
+    room.players.forEach(p => p.score = 0);
+
+    const currentTrack = room.tracks[room.currentTrackIndex];
+    room.timeRemaining = currentTrack.timeLimit;
+
+    ioInstance.to(PUBLIC_ROOM_CODE).emit('game:start', {
+      trackIndex: room.currentTrackIndex,
+      audioFile: currentTrack.audioFile,
+      imageFile: currentTrack.imageFile,
+      timeLimit: currentTrack.timeLimit,
+      startTime: currentTrack.startTime || 0,
+      totalTracks: room.tracks.length,
+    });
+
+    // Démarrer le timer
+    startTimerPublic(room);
+
+    console.log(`Partie publique lancée avec ${room.tracks.length} tracks`);
+  } catch (error) {
+    console.error('Erreur lancement partie publique:', error);
+  }
+}
+
+// Timer spécifique pour la room publique
+function startTimerPublic(room) {
+  if (room.timer) clearInterval(room.timer);
+
+  room.timer = setInterval(() => {
+    room.timeRemaining--;
+
+    if (ioInstance) {
+      ioInstance.to(PUBLIC_ROOM_CODE).emit('game:tick', room.timeRemaining);
+    }
+
+    if (room.timeRemaining <= 0) {
+      clearInterval(room.timer);
+      room.timer = null;
+
+      if (!room.roundFound) {
+        const currentTrack = room.tracks[room.currentTrackIndex];
+        if (ioInstance) {
+          ioInstance.to(PUBLIC_ROOM_CODE).emit('game:time-up', {
+            title: currentTrack.title,
+            imageFile: currentTrack.imageFile,
+          });
+        }
+
+        // Passer au suivant après 3 secondes
+        setTimeout(() => nextTrackPublic(room), 3000);
+      }
+    }
+  }, 1000);
+}
+
+// Passer au track suivant pour la room publique (boucle infinie)
+function nextTrackPublic(room) {
+  room.currentTrackIndex++;
+  room.roundFound = false;
+
+  // Si fin des tracks, reshuffle et recommencer
+  if (room.currentTrackIndex >= room.tracks.length) {
+    room.tracks = shuffleArray(room.tracks);
+    room.currentTrackIndex = 0;
+    // Reset scores pour la nouvelle manche
+    room.players.forEach(p => p.score = 0);
+    console.log(`Room publique: nouvelle manche, tracks reshufflées`);
+  }
+
+  // Si plus de joueurs, mettre en pause
+  if (room.players.length === 0) {
+    room.isPlaying = false;
+    if (room.timer) {
+      clearInterval(room.timer);
+      room.timer = null;
+    }
+    console.log(`Room publique: mise en pause (plus de joueurs)`);
+    return;
+  }
+
+  const currentTrack = room.tracks[room.currentTrackIndex];
+  room.timeRemaining = currentTrack.timeLimit;
+
+  if (ioInstance) {
+    ioInstance.to(PUBLIC_ROOM_CODE).emit('game:next', {
+      trackIndex: room.currentTrackIndex,
+      audioFile: currentTrack.audioFile,
+      imageFile: currentTrack.imageFile,
+      timeLimit: currentTrack.timeLimit,
+      startTime: currentTrack.startTime || 0,
+      totalTracks: room.tracks.length,
+    });
+  }
+
+  startTimerPublic(room);
+}
+
+app.prepare().then(async () => {
+  // Créer la room publique au démarrage
+  await createPublicRoom();
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   });
 
   const io = new Server(httpServer);
+  ioInstance = io; // Stocker pour les fonctions globales
 
   io.on('connection', (socket) => {
     console.log('Client connecté:', socket.id);
@@ -138,7 +315,8 @@ app.prepare().then(() => {
 
     // Rejoindre une room
     socket.on('room:join', (code, pseudo, callback) => {
-      const room = rooms.get(code.toUpperCase());
+      const roomCode = code.toUpperCase();
+      const room = rooms.get(roomCode);
 
       if (!room) {
         callback(false, 'Room introuvable');
@@ -148,8 +326,8 @@ app.prepare().then(() => {
       // If this socket is already registered in the room, don't add it again
       const existingById = room.players.find(p => p.id === socket.id);
       if (existingById) {
-        socket.join(code.toUpperCase());
-        currentRoom = code.toUpperCase();
+        socket.join(roomCode);
+        currentRoom = roomCode;
         currentPseudo = existingById.pseudo;
         callback(true, null, existingById.pseudo);
         return;
@@ -168,8 +346,8 @@ app.prepare().then(() => {
 
       const player = { id: socket.id, pseudo: finalPseudo, score: 0 };
       room.players.push(player);
-      socket.join(code.toUpperCase());
-      currentRoom = code.toUpperCase();
+      socket.join(roomCode);
+      currentRoom = roomCode;
       currentPseudo = finalPseudo;
 
       // If a deletion was scheduled because the room became temporarily empty, cancel it
@@ -180,6 +358,14 @@ app.prepare().then(() => {
 
       // Notifier les autres joueurs
       socket.to(currentRoom).emit('room:player-joined', player);
+
+      // Logique spéciale pour la room publique
+      if (room.isPublic) {
+        // Si la partie n'est pas en cours et pas de countdown actif, démarrer le countdown
+        if (!room.isPlaying && !room.startCountdown) {
+          startPublicRoomCountdown(room);
+        }
+      }
 
       console.log(`${finalPseudo} a rejoint la room ${code}`);
       callback(true, null, finalPseudo);
@@ -209,9 +395,13 @@ app.prepare().then(() => {
           audioFile: currentTrack.audioFile,
           imageFile: currentTrack.imageFile,
           timeLimit: currentTrack.timeLimit,
+          startTime: currentTrack.startTime || 0,
         } : null,
         totalTracks: room.tracks.length,
         categories: room.categories,
+        isPublic: room.isPublic || false,
+        startCountdownValue: room.startCountdownValue || null,
+        isCountingDown: room.startCountdown !== null,
       });
     });
 
@@ -242,6 +432,7 @@ app.prepare().then(() => {
           audioFile: currentTrack.audioFile,
           imageFile: currentTrack.imageFile,
           timeLimit: currentTrack.timeLimit,
+          startTime: currentTrack.startTime || 0,
           totalTracks: room.tracks.length,
         });
 
@@ -296,7 +487,11 @@ app.prepare().then(() => {
         });
 
         // Passer au track suivant après 3 secondes
-        setTimeout(() => nextTrack(room, currentRoom, io), 3000);
+        if (room.isPublic) {
+          setTimeout(() => nextTrackPublic(room), 3000);
+        } else {
+          setTimeout(() => nextTrack(room, currentRoom, io), 3000);
+        }
       }
     });
 
@@ -311,27 +506,34 @@ app.prepare().then(() => {
           if (room.players.length === 0) {
             if (room.timer) clearInterval(room.timer);
 
-            // Schedule deletion after a short grace period to allow reconnections
-            room.deletionTimer = setTimeout(() => {
-              const r = rooms.get(currentRoom);
-              if (r && r.players.length === 0) {
-                if (r.timer) clearInterval(r.timer);
-                rooms.delete(currentRoom);
-                console.log(`Room ${currentRoom} supprimée (vide)`);
-              }
-            }, 10000);
+            // Room publique: ne pas supprimer, juste mettre en pause
+            if (room.isPublic) {
+              room.isPlaying = false;
+              stopPublicRoomCountdown(room);
+              console.log(`Room publique: mise en pause (plus de joueurs)`);
+            } else {
+              // Schedule deletion after a short grace period to allow reconnections
+              room.deletionTimer = setTimeout(() => {
+                const r = rooms.get(currentRoom);
+                if (r && r.players.length === 0) {
+                  if (r.timer) clearInterval(r.timer);
+                  rooms.delete(currentRoom);
+                  console.log(`Room ${currentRoom} supprimée (vide)`);
+                }
+              }, 10000);
 
-            console.log(`Room ${currentRoom} will be deleted in 10s (empty)`);
+              console.log(`Room ${currentRoom} will be deleted in 10s (empty)`);
+            }
           } else {
             io.to(currentRoom).emit('room:player-left', socket.id);
 
-            // Ensure there is a valid host: if the leaving player was host or the host id
-            // is no longer present in the players list, reassign to the first connected player
-            // and notify clients.
-            if (room.hostId === socket.id || !room.players.some(p => p.id === room.hostId)) {
-              room.hostId = room.players[0].id;
-              io.to(currentRoom).emit('room:new-host', room.hostId);
-              console.log(`Room ${currentRoom} host reassigned to ${room.hostId}`);
+            // Pour les rooms non-publiques, gérer le host
+            if (!room.isPublic) {
+              if (room.hostId === socket.id || !room.players.some(p => p.id === room.hostId)) {
+                room.hostId = room.players[0].id;
+                io.to(currentRoom).emit('room:new-host', room.hostId);
+                console.log(`Room ${currentRoom} host reassigned to ${room.hostId}`);
+              }
             }
           }
         }
@@ -350,30 +552,37 @@ app.prepare().then(() => {
           room.players = room.players.filter(p => p.id !== socket.id);
 
           if (room.players.length === 0) {
-            // Supprimer la room si vide, avec délai pour permettre une reconnexion
             if (room.timer) clearInterval(room.timer);
 
-            room.deletionTimer = setTimeout(() => {
-              const r = rooms.get(currentRoom);
-              if (r && r.players.length === 0) {
-                if (r.timer) clearInterval(r.timer);
-                rooms.delete(currentRoom);
-                console.log(`Room ${currentRoom} supprimée (vide)`);
-              }
-            }, 10000);
+            // Room publique: ne pas supprimer, juste mettre en pause
+            if (room.isPublic) {
+              room.isPlaying = false;
+              stopPublicRoomCountdown(room);
+              console.log(`Room publique: mise en pause (plus de joueurs)`);
+            } else {
+              // Supprimer la room si vide, avec délai pour permettre une reconnexion
+              room.deletionTimer = setTimeout(() => {
+                const r = rooms.get(currentRoom);
+                if (r && r.players.length === 0) {
+                  if (r.timer) clearInterval(r.timer);
+                  rooms.delete(currentRoom);
+                  console.log(`Room ${currentRoom} supprimée (vide)`);
+                }
+              }, 10000);
 
-            console.log(`Room ${currentRoom} will be deleted in 10s (empty)`);
+              console.log(`Room ${currentRoom} will be deleted in 10s (empty)`);
+            }
           } else {
             // Notifier les autres
             io.to(currentRoom).emit('room:player-left', socket.id);
 
-            // Ensure there is a valid host: if the disconnecting player was host or the host id
-            // is no longer present in the players list, reassign to the first connected player
-            // and notify clients.
-            if (room.hostId === socket.id || !room.players.some(p => p.id === room.hostId)) {
-              room.hostId = room.players[0].id;
-              io.to(currentRoom).emit('room:new-host', room.hostId);
-              console.log(`Room ${currentRoom} host reassigned to ${room.hostId}`);
+            // Pour les rooms non-publiques, gérer le host
+            if (!room.isPublic) {
+              if (room.hostId === socket.id || !room.players.some(p => p.id === room.hostId)) {
+                room.hostId = room.players[0].id;
+                io.to(currentRoom).emit('room:new-host', room.hostId);
+                console.log(`Room ${currentRoom} host reassigned to ${room.hostId}`);
+              }
             }
           }
         }
@@ -430,6 +639,7 @@ app.prepare().then(() => {
       audioFile: currentTrack.audioFile,
       imageFile: currentTrack.imageFile,
       timeLimit: currentTrack.timeLimit,
+      startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
     });
 

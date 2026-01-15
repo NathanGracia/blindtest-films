@@ -27,7 +27,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit } = body;
+    const { title, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit, startTime } = body;
 
     // Vérifier que la catégorie existe si elle est fournie
     if (categoryId) {
@@ -50,6 +50,7 @@ export async function PUT(
       imageFile,
       categoryId,
       timeLimit,
+      startTime,
     });
 
     if (!updated) {
