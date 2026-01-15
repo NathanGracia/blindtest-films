@@ -148,14 +148,6 @@ export default function MultiLobby() {
           </div>
         )}
 
-        {/* Catégories pour la création */}
-        <div className="mb-6">
-          <CategorySelector
-            onSelectionChange={handleSelectionChange}
-            initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
-          />
-        </div>
-
         {/* Partie publique */}
         <div className="mb-6">
           <button
@@ -186,6 +178,14 @@ export default function MultiLobby() {
           </div>
         </div>
 
+        {/* Catégories pour la création */}
+        <div className="mb-6">
+          <CategorySelector
+            onSelectionChange={handleSelectionChange}
+            initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
+          />
+        </div>
+
         {/* Créer une partie privée */}
         <div className="mb-6">
           <button
@@ -209,11 +209,11 @@ export default function MultiLobby() {
             <div className="w-full border-t border-white/20"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-transparent text-white/50">ou rejoindre</span>
+            <span className="px-4 bg-transparent text-white/50">ou rejoindre une room privée</span>
           </div>
         </div>
 
-        {/* Rejoindre une partie */}
+        {/* Rejoindre une partie privée */}
         <div className="space-y-3">
           <label className="block text-[#7ec8e3] text-sm font-semibold">
             Code de la room

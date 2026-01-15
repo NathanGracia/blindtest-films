@@ -9,7 +9,7 @@ import AnswerInput from '@/components/AnswerInput';
 import ScoreBoard from '@/components/ScoreBoard';
 import RevealImage from '@/components/RevealImage';
 import { Track, Attempt } from '@/types';
-import { checkAnswer, shuffleArray } from '@/lib/utils';
+import { checkAnswer, isAnswerClose, shuffleArray } from '@/lib/utils';
 
 export default function GamePage() {
   const router = useRouter();
@@ -24,6 +24,7 @@ export default function GamePage() {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastScore, setLastScore] = useState<number | null>(null);
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
 
   // Calculer le score basé sur le temps restant
   const calculateScore = (timeRemaining: number, timeLimit: number) => {
@@ -124,6 +125,14 @@ export default function GamePage() {
       setIsPlaying(false);
       setShowResult(true);
       setWasCorrect(true);
+      setHintMessage(null);
+    } else {
+      // Vérifier si la réponse est proche
+      const isClose = isAnswerClose(answer, currentTrack.acceptedAnswers);
+      if (isClose) {
+        setHintMessage('🔥 Vous êtes proche !');
+        setTimeout(() => setHintMessage(null), 3000);
+      }
     }
   };
 
@@ -273,11 +282,23 @@ export default function GamePage() {
 
         {/* Zone de réponse */}
         {!showResult && (
-          <AnswerInput
-            onSubmit={handleSubmit}
-            attempts={attempts}
-            disabled={showResult}
-          />
+          <div className="relative">
+            <AnswerInput
+              onSubmit={handleSubmit}
+              attempts={attempts}
+              disabled={showResult}
+            />
+
+            {/* Message hint en bas */}
+            {hintMessage && (
+              <div className="absolute -bottom-16 left-0 right-0 glass rounded-xl p-3 bg-orange-500/20 border border-orange-500/50">
+                <p className="text-orange-300 font-semibold text-sm flex items-center justify-center gap-2">
+                  <span>💡</span>
+                  {hintMessage}
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

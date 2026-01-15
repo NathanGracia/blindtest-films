@@ -73,6 +73,7 @@ export interface ChatMessage {
   isCorrect: boolean;
   playerId: string;
   isFromFinder?: boolean;
+  isHint?: boolean;
 }
 
 // Types Admin

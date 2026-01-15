@@ -17,6 +17,32 @@ const prisma = new PrismaClient();
 // Code de la room publique permanente
 const PUBLIC_ROOM_CODE = 'PUBLIC';
 
+// Calcul de la distance de Levenshtein (nombre de modifications nécessaires)
+function levenshteinDistance(str1, str2) {
+  const m = str1.length;
+  const n = str2.length;
+  const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,    // suppression
+          dp[i][j - 1] + 1,    // insertion
+          dp[i - 1][j - 1] + 1 // substitution
+        );
+      }
+    }
+  }
+
+  return dp[m][n];
+}
+
 // Charger les tracks depuis la base de données
 async function loadTracks() {
   const tracks = await prisma.track.findMany();
@@ -516,6 +542,27 @@ app.prepare().then(async () => {
       const currentTrack = room.tracks[room.currentTrackIndex];
       // Ne pas vérifier si déjà trouvé
       const isCorrect = !alreadyFound && checkAnswer(answer, currentTrack.acceptedAnswers);
+
+      // Vérifier si la réponse est proche (à 2 caractères près)
+      let isClose = false;
+      if (!isCorrect && !alreadyFound) {
+        const normalizedInput = normalizeAnswer(answer);
+        for (const acceptedAnswer of currentTrack.acceptedAnswers) {
+          const normalizedAccepted = normalizeAnswer(acceptedAnswer);
+          const distance = levenshteinDistance(normalizedInput, normalizedAccepted);
+          if (distance <= 2 && distance > 0) {
+            isClose = true;
+            break;
+          }
+        }
+      }
+
+      // Si proche mais pas exact, envoyer un message privé
+      if (isClose) {
+        socket.emit('chat:hint', {
+          message: '🔥 Vous êtes proche !',
+        });
+      }
 
       // Créer le message
       const chatMessage = {

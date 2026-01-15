@@ -34,6 +34,7 @@ export default function MultiGameRoom() {
   const [myScoreThisRound, setMyScoreThisRound] = useState<number | null>(null);
   const [findersCount, setFindersCount] = useState(0);
   const [roundFinders, setRoundFinders] = useState<{id: string; pseudo: string}[]>([]);
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
 
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
@@ -171,6 +172,12 @@ export default function MultiGameRoom() {
       setMessages((prev) => [...prev, msg]);
     });
 
+    // Indice: réponse proche
+    socket.on('chat:hint', (data: { message: string }) => {
+      setHintMessage(data.message);
+      setTimeout(() => setHintMessage(null), 3000);
+    });
+
     // Notification privée: tu as trouvé la réponse
     socket.on('game:you-found', (data: { scoreEarned: number; timeRemaining: number; isFirst: boolean }) => {
       setHasFoundThisRound(true);
@@ -258,6 +265,7 @@ export default function MultiGameRoom() {
       socket.off('game:start');
       socket.off('game:tick');
       socket.off('chat:message');
+      socket.off('chat:hint');
       socket.off('game:you-found');
       socket.off('game:player-found');
       socket.off('game:round-end');
@@ -574,7 +582,7 @@ export default function MultiGameRoom() {
             )}
 
             {/* Chat / Réponses */}
-            <div className="glass rounded-xl overflow-hidden">
+            <div className="glass rounded-xl overflow-hidden relative">
               <div
                 ref={chatRef}
                 className="h-48 overflow-y-auto p-4 space-y-2"
@@ -588,7 +596,7 @@ export default function MultiGameRoom() {
                     <div
                       key={i}
                       className={`flex items-start gap-2 ${
-                        msg.isCorrect ? 'animate-pulse' : ''
+                        msg.isCorrect ? 'animate-pulse bg-green-500/10 border border-green-500/30 rounded px-2 py-1' : ''
                       } ${
                         msg.isFromFinder ? 'opacity-90' : ''
                       }`}
@@ -625,6 +633,17 @@ export default function MultiGameRoom() {
                   ))
                 )}
               </div>
+
+              {/* Message hint en bas du chat */}
+              {hintMessage && (
+                <div className="absolute bottom-0 left-0 right-0 bg-orange-500/20 border-t border-orange-500/50 px-4 py-2 backdrop-blur-sm">
+                  <p className="text-orange-300 font-semibold text-sm flex items-center gap-2">
+                    <span>💡</span>
+                    {hintMessage}
+                  </p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="flex border-t border-white/20">
                 <input
                   ref={inputRef}

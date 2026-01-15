@@ -41,22 +41,22 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Category Selector */}
+          {/* Category Selector with Solo Button */}
           <div className="mb-6">
             <CategorySelector
               onSelectionChange={handleSelectionChange}
               initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
             />
-          </div>
-
-          {/* Buttons */}
-          <div className="space-y-3">
             <Link
               href="/game"
-              className="btn-aero-green block w-full px-8 py-4 text-white text-xl font-semibold rounded-xl"
+              className="btn-aero-green block w-full px-8 py-4 text-white text-xl font-semibold rounded-xl mt-4"
             >
               🎮 Jouer Solo
             </Link>
+          </div>
+
+          {/* Multiplayer Button */}
+          <div className="mb-6">
             <Link
               href="/multi"
               className="btn-aero block w-full px-8 py-4 text-white text-xl font-semibold rounded-xl"
