@@ -257,6 +257,11 @@ export default function GamePage() {
             <p className="text-3xl font-bold text-white mt-3 text-glow">
               {currentTrack.title}
             </p>
+            {currentTrack.titleVF && (
+              <p className="text-xl text-white/70 mt-1">
+                ({currentTrack.titleVF})
+              </p>
+            )}
             <button
               onClick={nextTrack}
               className="btn-aero mt-6 px-8 py-3 text-white rounded-xl font-semibold"

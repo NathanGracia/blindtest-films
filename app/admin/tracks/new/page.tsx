@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { Category } from '@/types';
 import FileUpload from '@/components/admin/FileUpload';
 import SelectListbox from '@/components/SelectListbox';
+import TagInput from '@/components/admin/TagInput';
 
 export default function NewTrackPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState('');
-  const [acceptedAnswers, setAcceptedAnswers] = useState('');
+  const [titleVF, setTitleVF] = useState('');
+  const [acceptedAnswers, setAcceptedAnswers] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [audioFile, setAudioFile] = useState('');
   const [imageFile, setImageFile] = useState('');
@@ -106,13 +108,17 @@ export default function NewTrackPage() {
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    // Auto-générer les réponses acceptées si le champ est vide
-    if (!acceptedAnswers) {
-      const normalized = value
-        .toLowerCase()
+    // Auto-générer les réponses acceptées si le tableau est vide
+    if (acceptedAnswers.length === 0 && value.trim()) {
+      const lower = value.toLowerCase();
+      const normalized = lower
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
-      setAcceptedAnswers(normalized !== value.toLowerCase() ? `${value.toLowerCase()}, ${normalized}` : value.toLowerCase());
+      const answers = [lower];
+      if (normalized !== lower) {
+        answers.push(normalized);
+      }
+      setAcceptedAnswers(answers);
     }
   };
 
@@ -133,7 +139,8 @@ export default function NewTrackPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          acceptedAnswers: acceptedAnswers.split(',').map(a => a.trim()).filter(Boolean),
+          titleVF: titleVF || null,
+          acceptedAnswers,
           categoryId,
           audioFile,
           imageFile: imageFile || null,
@@ -174,35 +181,44 @@ export default function NewTrackPage() {
         <div className="glass rounded-xl p-6 space-y-6">
           <h3 className="text-lg font-semibold text-white">Informations</h3>
 
-          <div>
-            <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
-              Titre *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              placeholder="Ex: Le Roi Lion"
-              className="input-aero w-full px-4 py-3 text-white rounded-xl"
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
+                Titre VO (Version Originale) *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                placeholder="Ex: The Lion King"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
+                Titre VF (Version Française)
+              </label>
+              <input
+                type="text"
+                value={titleVF}
+                onChange={(e) => setTitleVF(e.target.value)}
+                placeholder="Ex: Le Roi Lion"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
               Réponses acceptées *
             </label>
-            <input
-              type="text"
-              value={acceptedAnswers}
-              onChange={(e) => setAcceptedAnswers(e.target.value)}
-              placeholder="roi lion, le roi lion, lion king"
-              className="input-aero w-full px-4 py-3 text-white rounded-xl"
-              required
+            <TagInput
+              tags={acceptedAnswers}
+              onChange={setAcceptedAnswers}
+              placeholder="Ajouter une réponse..."
             />
-            <p className="text-white/40 text-xs mt-1">
-              Séparez les réponses par des virgules. Incluez les variantes sans accents.
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -27,7 +27,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit, startTime } = body;
+    const { title, titleVF, acceptedAnswers, audioFile, imageFile, categoryId, timeLimit, startTime } = body;
 
     // Vérifier que la catégorie existe si elle est fournie
     if (categoryId) {
@@ -45,6 +45,7 @@ export async function PUT(
 
     const updated = await updateTrack(parseInt(id, 10), {
       title,
+      titleVF,
       acceptedAnswers: answers,
       audioFile,
       imageFile,

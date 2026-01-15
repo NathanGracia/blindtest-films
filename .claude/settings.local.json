@@ -9,7 +9,14 @@
       "Bash(npm run db:seed:*)",
       "Bash(node -e:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(pip install:*)",
+      "Bash(winget install:*)",
+      "Bash(python scripts/hydrate_db.py:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(ping:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

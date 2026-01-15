@@ -5,14 +5,11 @@ import path from 'path';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Début de la migration des données...');
+  console.log('Initialisation des catégories...');
 
-  // Charger les fichiers JSON
+  // Charger les catégories depuis le fichier JSON
   const categoriesPath = path.join(process.cwd(), 'data', 'categories.json');
-  const tracksPath = path.join(process.cwd(), 'data', 'tracks.json');
-
   const categories = JSON.parse(fs.readFileSync(categoriesPath, 'utf-8'));
-  const tracks = JSON.parse(fs.readFileSync(tracksPath, 'utf-8'));
 
   // Insérer les catégories
   console.log(`Insertion de ${categories.length} catégories...`);
@@ -33,37 +30,15 @@ async function main() {
     });
   }
 
-  // Insérer les tracks
-  console.log(`Insertion de ${tracks.length} tracks...`);
-  for (const track of tracks) {
-    await prisma.track.upsert({
-      where: { id: track.id },
-      update: {
-        title: track.title,
-        acceptedAnswers: JSON.stringify(track.acceptedAnswers),
-        audioFile: track.audioFile,
-        imageFile: track.imageFile,
-        timeLimit: track.timeLimit,
-        categoryId: track.categoryId,
-      },
-      create: {
-        id: track.id,
-        title: track.title,
-        acceptedAnswers: JSON.stringify(track.acceptedAnswers),
-        audioFile: track.audioFile,
-        imageFile: track.imageFile,
-        timeLimit: track.timeLimit,
-        categoryId: track.categoryId,
-      },
-    });
-  }
-
-  console.log('Migration terminée !');
+  console.log('Catégories initialisées !');
+  console.log('\nPour ajouter des tracks, utilisez:');
+  console.log('  - L\'interface admin: http://localhost:3000/admin/tracks');
+  console.log('  - Le script Python: python scripts/hydrate_db.py --api-key VOTRE_CLE');
 }
 
 main()
   .catch((e) => {
-    console.error('Erreur lors de la migration:', e);
+    console.error('Erreur:', e);
     process.exit(1);
   })
   .finally(async () => {

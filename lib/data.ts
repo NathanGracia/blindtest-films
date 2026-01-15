@@ -5,6 +5,7 @@ import { Track, Category } from '@/types';
 function toTrack(dbTrack: {
   id: number;
   title: string;
+  titleVF: string | null;
   acceptedAnswers: string;
   audioFile: string;
   imageFile: string | null;
@@ -53,6 +54,7 @@ export async function addTrack(track: Omit<Track, 'id'>): Promise<Track> {
   const newTrack = await prisma.track.create({
     data: {
       title: track.title,
+      titleVF: track.titleVF,
       acceptedAnswers: JSON.stringify(track.acceptedAnswers),
       audioFile: track.audioFile,
       imageFile: track.imageFile,
@@ -70,6 +72,7 @@ export async function updateTrack(id: number, updates: Partial<Track>): Promise<
     const data: Record<string, unknown> = {};
 
     if (updates.title !== undefined) data.title = updates.title;
+    if (updates.titleVF !== undefined) data.titleVF = updates.titleVF;
     if (updates.acceptedAnswers !== undefined) data.acceptedAnswers = JSON.stringify(updates.acceptedAnswers);
     if (updates.audioFile !== undefined) data.audioFile = updates.audioFile;
     if (updates.imageFile !== undefined) data.imageFile = updates.imageFile;

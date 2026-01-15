@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Category, Track } from '@/types';
 import FileUpload from '@/components/admin/FileUpload';
+import TagInput from '@/components/admin/TagInput';
 
 export default function EditTrackPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -12,7 +13,8 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
   const [track, setTrack] = useState<Track | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState('');
-  const [acceptedAnswers, setAcceptedAnswers] = useState('');
+  const [titleVF, setTitleVF] = useState('');
+  const [acceptedAnswers, setAcceptedAnswers] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [audioFile, setAudioFile] = useState('');
   const [imageFile, setImageFile] = useState('');
@@ -44,7 +46,8 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
           const data = await trackRes.json();
           setTrack(data);
           setTitle(data.title);
-          setAcceptedAnswers(data.acceptedAnswers.join(', '));
+          setTitleVF(data.titleVF || '');
+          setAcceptedAnswers(data.acceptedAnswers);
           setCategoryId(data.categoryId);
           setAudioFile(data.audioFile);
           setImageFile(data.imageFile || '');
@@ -138,7 +141,8 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          acceptedAnswers: acceptedAnswers.split(',').map(a => a.trim()).filter(Boolean),
+          titleVF: titleVF || null,
+          acceptedAnswers,
           categoryId,
           audioFile,
           imageFile: imageFile || null,
@@ -201,35 +205,44 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
         <div className="glass rounded-xl p-6 space-y-6">
           <h3 className="text-lg font-semibold text-white">Informations</h3>
 
-          <div>
-            <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
-              Titre *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Le Roi Lion"
-              className="input-aero w-full px-4 py-3 text-white rounded-xl"
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
+                Titre VO (Version Originale) *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: The Lion King"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
+                Titre VF (Version Française)
+              </label>
+              <input
+                type="text"
+                value={titleVF}
+                onChange={(e) => setTitleVF(e.target.value)}
+                placeholder="Ex: Le Roi Lion"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
               Réponses acceptées *
             </label>
-            <input
-              type="text"
-              value={acceptedAnswers}
-              onChange={(e) => setAcceptedAnswers(e.target.value)}
-              placeholder="roi lion, le roi lion, lion king"
-              className="input-aero w-full px-4 py-3 text-white rounded-xl"
-              required
+            <TagInput
+              tags={acceptedAnswers}
+              onChange={setAcceptedAnswers}
+              placeholder="Ajouter une réponse..."
             />
-            <p className="text-white/40 text-xs mt-1">
-              Séparez les réponses par des virgules. Incluez les variantes sans accents.
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

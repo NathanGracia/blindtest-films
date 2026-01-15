@@ -17,7 +17,8 @@ model Category {
 
 model Track {
   id              Int      @id @default(autoincrement())
-  title           String
+  title           String   // Titre VO (version originale)
+  titleVF         String?  // Titre VF (version française)
   acceptedAnswers String   // Stocké en JSON
   audioFile       String
   imageFile       String?

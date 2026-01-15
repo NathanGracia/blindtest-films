@@ -217,6 +217,7 @@ function startTimerPublic(room) {
       if (ioInstance) {
         ioInstance.to(PUBLIC_ROOM_CODE).emit('game:round-end', {
           title: currentTrack.title,
+          titleVF: currentTrack.titleVF,
           imageFile: currentTrack.imageFile,
           finders,
           players: room.players,
@@ -516,12 +517,9 @@ app.prepare().then(async () => {
         // Envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', foundMessage);
       } else {
-        // Mauvaise réponse : envoyer à ceux qui n'ont pas trouvé
-        room.players.forEach(player => {
-          if (!room.roundFinders.has(player.id)) {
-            io.to(player.id).emit('chat:message', chatMessage);
-          }
-        });
+        // Mauvaise réponse : envoyer à tout le monde (gagnants et non-gagnants)
+        // Les gagnants peuvent ainsi voir les tentatives des autres pour les aider
+        io.to(currentRoom).emit('chat:message', chatMessage);
       }
 
       if (isCorrect) {
@@ -571,6 +569,7 @@ app.prepare().then(async () => {
 
           io.to(currentRoom).emit('game:round-end', {
             title: currentTrack.title,
+            titleVF: currentTrack.titleVF,
             imageFile: currentTrack.imageFile,
             finders,
             players: room.players,
@@ -704,6 +703,7 @@ app.prepare().then(async () => {
 
         io.to(roomCode).emit('game:round-end', {
           title: currentTrack.title,
+          titleVF: currentTrack.titleVF,
           imageFile: currentTrack.imageFile,
           finders,
           players: room.players,

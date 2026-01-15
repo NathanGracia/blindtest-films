@@ -14,8 +14,10 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showLoader, setShowLoader] = useState(false);
   const prevSrcRef = useRef<string>('');
   const hasSetStartTime = useRef(false);
+  const loaderTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Reset state when src changes
   useEffect(() => {
@@ -24,7 +26,18 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
       setHasError(false);
       setIsReady(false);
       setIsLoading(true);
+      setShowLoader(false);
       hasSetStartTime.current = false;
+
+      // Clear any existing loader timeout
+      if (loaderTimeoutRef.current) {
+        clearTimeout(loaderTimeoutRef.current);
+      }
+
+      // Only show loader after 300ms (avoid flash on quick loads)
+      loaderTimeoutRef.current = setTimeout(() => {
+        setShowLoader(true);
+      }, 300);
 
       if (audioRef.current) {
         audioRef.current.pause();
@@ -33,6 +46,15 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
       }
     }
   }, [src, startTime]);
+
+  // Cleanup loader timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loaderTimeoutRef.current) {
+        clearTimeout(loaderTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle play/pause
   useEffect(() => {
@@ -57,6 +79,13 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
     setIsReady(true);
     setHasError(false);
     setIsLoading(false);
+    setShowLoader(false);
+
+    // Clear loader timeout since we're ready
+    if (loaderTimeoutRef.current) {
+      clearTimeout(loaderTimeoutRef.current);
+    }
+
     // Set initial position to startTime when ready
     if (audioRef.current && !hasSetStartTime.current) {
       audioRef.current.currentTime = startTime;
@@ -86,14 +115,14 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
         {/* Main disc */}
         <div
           className={`relative w-28 h-28 rounded-full flex items-center justify-center glass ${
-            hasError ? 'border-red-500/50' : 'glow-blue'
+            hasError ? 'border-white/20' : 'glow-blue'
           }`}
         >
-          {isLoading ? (
-            <div className="w-10 h-10 border-4 border-[#7ec8e3] border-t-transparent rounded-full animate-spin" />
+          {isLoading && showLoader ? (
+            <div className="w-6 h-6 border-2 border-[#7ec8e3]/40 border-t-[#7ec8e3] rounded-full animate-spin" />
           ) : hasError ? (
             <svg
-              className="w-12 h-12 text-red-400"
+              className="w-10 h-10 text-white/40"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -142,7 +171,7 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
       {/* Error message (without filename to avoid spoilers) */}
       {hasError && (
         <div className="text-center glass rounded-lg px-4 py-2">
-          <p className="text-red-400 text-sm">Erreur de chargement audio</p>
+          <p className="text-white/50 text-sm">Chargement en cours...</p>
         </div>
       )}
 

@@ -21,6 +21,7 @@ export default function MultiGameRoom() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [resultTitle, setResultTitle] = useState('');
+  const [resultTitleVF, setResultTitleVF] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
@@ -186,9 +187,10 @@ export default function MultiGameRoom() {
     });
 
     // Fin du round: révèle la réponse à tous
-    socket.on('game:round-end', (data: { title: string; imageFile?: string; finders: {id: string; pseudo: string}[]; players: Player[]; totalFound: number }) => {
+    socket.on('game:round-end', (data: { title: string; titleVF?: string; imageFile?: string; finders: {id: string; pseudo: string}[]; players: Player[]; totalFound: number }) => {
       setShowResult(true);
       setResultTitle(data.title);
+      setResultTitleVF(data.titleVF || null);
       setResultImage(data.imageFile || null);
       setRoundFinders(data.finders);
       setIsPlaying(false);
@@ -278,7 +280,7 @@ export default function MultiGameRoom() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !isPlaying || showResult || hasFoundThisRound) return;
+    if (!input.trim() || !isPlaying || showResult) return;
 
     socketRef.current.emit('game:answer', input.trim());
     setInput('');
@@ -354,6 +356,19 @@ export default function MultiGameRoom() {
     return (
       <div className="min-h-screen aero-bg p-4">
         <div className="max-w-md mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleLeave}
+              className="glass px-4 py-2 rounded-lg text-white/70 hover:text-white transition-colors"
+            >
+              ← Quitter
+            </button>
+            <div className="glass px-4 py-2 rounded-lg text-[#7ec8e3]">
+              {room.isPublic ? '🌍 Partie Publique' : '👥 Partie Multi'}
+            </div>
+          </div>
+
           <div className="glass rounded-2xl p-6">
             <h1 className="text-2xl font-bold text-white mb-2">
               {room.isPublic ? 'Partie Publique' : 'Room'}
@@ -426,15 +441,6 @@ export default function MultiGameRoom() {
               </div>
             )}
           </div>
-
-          <div className="mt-4">
-            <button
-              onClick={handleLeave}
-              className="btn-aero w-full px-6 py-3 text-white font-semibold rounded-xl"
-            >
-              🚪 Quitter
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -443,20 +449,28 @@ export default function MultiGameRoom() {
   // Jeu en cours
   return (
     <div className="min-h-screen aero-bg p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handleLeave}
+            className="glass px-4 py-2 rounded-lg text-white/70 hover:text-white transition-colors"
+          >
+            ← Quitter
+          </button>
+          <div className="glass px-4 py-2 rounded-lg text-[#7ec8e3]">
+            {room.isPublic ? '🌍 Partie Publique' : '👥 Partie Multi'}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Colonne principale */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Info partie */}
-            <div className="flex justify-between items-center glass rounded-xl p-3">
+            {/* Info musique */}
+            <div className="flex justify-center items-center glass rounded-xl p-3">
               <span className="text-white/60">
                 Musique {(room.currentTrackIndex || 0) + 1} / {room.totalTracks}
               </span>
-              {room.isPublic ? (
-                <span className="text-[#7ec8e3] font-semibold">🌍 Partie Publique</span>
-              ) : (
-                <code className="text-[#7ec8e3] font-mono tracking-wider">{roomCode}</code>
-              )}
             </div>
 
             {/* Timer */}
@@ -533,6 +547,11 @@ export default function MultiGameRoom() {
                 )}
 
                 <p className="text-3xl font-bold text-white mt-3 text-glow">{resultTitle}</p>
+                {resultTitleVF && (
+                  <p className="text-xl text-white/70 mt-1">
+                    ({resultTitleVF})
+                  </p>
+                )}
               </div>
             )}
 
@@ -552,23 +571,38 @@ export default function MultiGameRoom() {
                       key={i}
                       className={`flex items-start gap-2 ${
                         msg.isCorrect ? 'animate-pulse' : ''
+                      } ${
+                        msg.isFromFinder ? 'opacity-90' : ''
                       }`}
                     >
                       <span
                         className={`font-semibold ${
-                          msg.playerId === myId ? 'text-[#7ec8e3]' : 'text-[#4a90d9]'
+                          msg.isFromFinder
+                            ? 'text-[#4a90d9]'
+                            : msg.playerId === myId
+                              ? 'text-[#7ec8e3]'
+                              : 'text-[#4a90d9]'
                         }`}
                       >
                         {msg.pseudo}:
                       </span>
                       <span
                         className={
-                          msg.isCorrect ? 'text-[#7fba00] font-bold' : 'text-white/70'
+                          msg.isCorrect
+                            ? 'text-[#7fba00] font-bold'
+                            : msg.isFromFinder
+                              ? 'text-[#4a90d9]/90 italic'
+                              : 'text-white/70'
                         }
                       >
                         {msg.message}
                       </span>
                       {msg.isCorrect && <span className="text-[#7fba00]">✓</span>}
+                      {msg.isFromFinder && (
+                        <span className="text-[#4a90d9] text-xs" title="Message d'un gagnant">
+                          👑
+                        </span>
+                      )}
                     </div>
                   ))
                 )}
@@ -579,20 +613,18 @@ export default function MultiGameRoom() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  disabled={!isPlaying || showResult || hasFoundThisRound}
+                  disabled={!isPlaying || showResult}
                   placeholder={
-                    hasFoundThisRound
-                      ? 'Tu as déjà trouvé!'
-                      : isPlaying
-                        ? 'Devine la musique...'
-                        : 'En attente...'
+                    isPlaying
+                      ? 'Devine la musique...'
+                      : 'En attente...'
                   }
                   className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
                   autoComplete="off"
                 />
                 <button
                   type="submit"
-                  disabled={!isPlaying || showResult || hasFoundThisRound || !input.trim()}
+                  disabled={!isPlaying || showResult || !input.trim()}
                   className="btn-aero px-6 py-3 text-white rounded-none border-0 border-l border-white/20 disabled:opacity-50"
                 >
                   Envoyer

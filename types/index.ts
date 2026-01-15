@@ -9,7 +9,8 @@ export interface Category {
 // Types pour les musiques (anciennement Film)
 export interface Track {
   id: number;
-  title: string;
+  title: string;        // Titre VO (version originale)
+  titleVF: string | null; // Titre VF (version française)
   acceptedAnswers: string[];
   audioFile: string;
   imageFile: string | null;
