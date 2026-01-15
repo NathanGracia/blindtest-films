@@ -239,6 +239,14 @@ export default function MultiGameRoom() {
       }
     });
 
+    socket.on('public:restart-countdown', (countdown: number) => {
+      setPublicCountdown(countdown);
+      if (countdown <= 0) {
+        setPublicCountdown(null);
+        setIsFinished(false);
+      }
+    });
+
     return () => {
       // Emit leave when the component unmounts so server state is cleaned up
       socket.emit('room:leave');
@@ -256,6 +264,7 @@ export default function MultiGameRoom() {
       socket.off('game:next');
       socket.off('game:end');
       socket.off('public:countdown');
+      socket.off('public:restart-countdown');
     };
   }, [router, roomCode]);
 
@@ -303,8 +312,8 @@ export default function MultiGameRoom() {
     );
   }
 
-  // Écran de fin (uniquement pour les rooms privées)
-  if (isFinished && !room.isPublic) {
+  // Écran de fin
+  if (isFinished) {
     return (
       <div className="min-h-screen aero-bg flex items-center justify-center p-4">
         <div className="glass rounded-2xl p-8 max-w-md w-full text-center">
@@ -332,7 +341,16 @@ export default function MultiGameRoom() {
               </div>
             ))}
           </div>
-          {room.hostId === myId && (
+          {room.isPublic && publicCountdown !== null && (
+            <div className="glass rounded-xl p-6 mb-4">
+              <p className="text-white/60 mb-2">Nouvelle partie dans</p>
+              <div className="text-6xl font-bold text-[#7ec8e3] text-glow">
+                {publicCountdown}
+              </div>
+              <p className="text-white/40 text-sm mt-2">secondes</p>
+            </div>
+          )}
+          {!room.isPublic && room.hostId === myId && (
             <button
               onClick={handleStartGame}
               className="btn-aero-green w-full px-6 py-3 text-white rounded-xl font-semibold mb-3"
@@ -344,7 +362,7 @@ export default function MultiGameRoom() {
             onClick={handleLeave}
             className="btn-aero w-full px-6 py-3 text-white rounded-xl"
           >
-            🚪 Quitter
+            {room.isPublic ? '🏠 Retour à l\'accueil' : '🚪 Quitter'}
           </button>
         </div>
       </div>
@@ -394,7 +412,7 @@ export default function MultiGameRoom() {
             )}
             {room.isPublic && (
               <p className="text-white/50 text-sm mt-2">
-                Toutes les musiques • Partie en boucle
+                25 musiques aléatoires • Partie classée
               </p>
             )}
           </div>

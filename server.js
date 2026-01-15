@@ -33,13 +33,15 @@ const rooms = new Map();
 async function createPublicRoom() {
   try {
     const allTracks = await loadTracks();
+    const shuffled = shuffleArray(allTracks);
+    const limitedTracks = shuffled.slice(0, 25); // Limiter à 25 œuvres
     const publicRoom = {
       code: PUBLIC_ROOM_CODE,
       players: [],
       currentTrackIndex: 0,
       isPlaying: false,
       hostId: null, // Pas de host pour la room publique
-      tracks: shuffleArray(allTracks),
+      tracks: limitedTracks,
       categories: [], // Toutes les catégories
       timer: null,
       timeRemaining: 30,
@@ -47,10 +49,10 @@ async function createPublicRoom() {
       deletionTimer: null,
       isPublic: true,
       startCountdown: null,
-      startCountdownValue: 30,
+      startCountdownValue: 15,
     };
     rooms.set(PUBLIC_ROOM_CODE, publicRoom);
-    console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${allTracks.length} tracks`);
+    console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${limitedTracks.length} tracks`);
     return publicRoom;
   } catch (error) {
     console.error('Erreur création room publique:', error);
@@ -160,7 +162,8 @@ async function startPublicGame(room) {
 
   try {
     const allTracks = await loadTracks();
-    room.tracks = shuffleArray(allTracks);
+    const shuffled = shuffleArray(allTracks);
+    room.tracks = shuffled.slice(0, 25); // Limiter à 25 œuvres
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
@@ -231,19 +234,43 @@ function startTimerPublic(room) {
   }, 1000);
 }
 
-// Passer au track suivant pour la room publique (boucle infinie)
+// Passer au track suivant pour la room publique
 function nextTrackPublic(room) {
   room.currentTrackIndex++;
   room.roundFinders = new Set();
   room.players.forEach(p => p.hasFoundThisRound = false);
 
-  // Si fin des tracks, reshuffle et recommencer
+  // Si fin des tracks (25 œuvres), fin de partie
   if (room.currentTrackIndex >= room.tracks.length) {
-    room.tracks = shuffleArray(room.tracks);
-    room.currentTrackIndex = 0;
-    // Reset scores pour la nouvelle manche
-    room.players.forEach(p => p.score = 0);
-    console.log(`Room publique: nouvelle manche, tracks reshufflées`);
+    room.isPlaying = false;
+    if (room.timer) {
+      clearInterval(room.timer);
+      room.timer = null;
+    }
+    if (ioInstance) {
+      ioInstance.to(PUBLIC_ROOM_CODE).emit('game:end', {
+        players: room.players.sort((a, b) => b.score - a.score),
+      });
+    }
+    console.log(`Room publique: partie terminée, ${room.players.length} joueurs`);
+
+    // Lancer le countdown pour une nouvelle partie après 15 secondes
+    room.startCountdownValue = 15;
+    room.startCountdown = setInterval(async () => {
+      room.startCountdownValue--;
+
+      if (ioInstance) {
+        ioInstance.to(PUBLIC_ROOM_CODE).emit('public:restart-countdown', room.startCountdownValue);
+      }
+
+      if (room.startCountdownValue <= 0) {
+        clearInterval(room.startCountdown);
+        room.startCountdown = null;
+        await startPublicGame(room);
+      }
+    }, 1000);
+
+    return;
   }
 
   // Si plus de joueurs, mettre en pause
