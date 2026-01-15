@@ -43,7 +43,7 @@ async function createPublicRoom() {
       categories: [], // Toutes les catégories
       timer: null,
       timeRemaining: 30,
-      roundFound: false,
+      roundFinders: new Set(), // Joueurs qui ont trouvé ce round
       deletionTimer: null,
       isPublic: true,
       startCountdown: null,
@@ -83,6 +83,22 @@ function checkAnswer(input, acceptedAnswers) {
   return acceptedAnswers.some(
     (answer) => normalizeAnswer(answer) === normalizedInput
   );
+}
+
+// Calculer le score basé sur le temps restant (style Skribbl.io)
+function calculateScore(timeRemaining, timeLimit, isFirstFinder) {
+  const MIN_SCORE = 100;
+  const MAX_SCORE = 1000;
+  const FIRST_BONUS = 200;
+
+  const timeRatio = timeRemaining / timeLimit;
+  let score = Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * timeRatio);
+
+  if (isFirstFinder) {
+    score += FIRST_BONUS;
+  }
+
+  return score;
 }
 
 // Mélanger un tableau
@@ -147,10 +163,13 @@ async function startPublicGame(room) {
     room.tracks = shuffleArray(allTracks);
     room.currentTrackIndex = 0;
     room.isPlaying = true;
-    room.roundFound = false;
+    room.roundFinders = new Set();
 
-    // Reset scores de tous les joueurs
-    room.players.forEach(p => p.score = 0);
+    // Reset scores et états des joueurs
+    room.players.forEach(p => {
+      p.score = 0;
+      p.hasFoundThisRound = false;
+    });
 
     const currentTrack = room.tracks[room.currentTrackIndex];
     room.timeRemaining = currentTrack.timeLimit;
@@ -188,18 +207,25 @@ function startTimerPublic(room) {
       clearInterval(room.timer);
       room.timer = null;
 
-      if (!room.roundFound) {
-        const currentTrack = room.tracks[room.currentTrackIndex];
-        if (ioInstance) {
-          ioInstance.to(PUBLIC_ROOM_CODE).emit('game:time-up', {
-            title: currentTrack.title,
-            imageFile: currentTrack.imageFile,
-          });
-        }
+      // Fin du round - révéler la réponse à tous
+      const currentTrack = room.tracks[room.currentTrackIndex];
+      const finders = Array.from(room.roundFinders).map(id => {
+        const p = room.players.find(player => player.id === id);
+        return p ? { id, pseudo: p.pseudo } : null;
+      }).filter(Boolean);
 
-        // Passer au suivant après 3 secondes
-        setTimeout(() => nextTrackPublic(room), 3000);
+      if (ioInstance) {
+        ioInstance.to(PUBLIC_ROOM_CODE).emit('game:round-end', {
+          title: currentTrack.title,
+          imageFile: currentTrack.imageFile,
+          finders,
+          players: room.players,
+          totalFound: room.roundFinders.size,
+        });
       }
+
+      // Passer au suivant après 3 secondes
+      setTimeout(() => nextTrackPublic(room), 3000);
     }
   }, 1000);
 }
@@ -207,7 +233,8 @@ function startTimerPublic(room) {
 // Passer au track suivant pour la room publique (boucle infinie)
 function nextTrackPublic(room) {
   room.currentTrackIndex++;
-  room.roundFound = false;
+  room.roundFinders = new Set();
+  room.players.forEach(p => p.hasFoundThisRound = false);
 
   // Si fin des tracks, reshuffle et recommencer
   if (room.currentTrackIndex >= room.tracks.length) {
@@ -288,7 +315,7 @@ app.prepare().then(async () => {
 
         const room = {
           code,
-          players: [{ id: socket.id, pseudo, score: 0 }],
+          players: [{ id: socket.id, pseudo, score: 0, hasFoundThisRound: false }],
           currentTrackIndex: 0,
           isPlaying: false,
           hostId: socket.id,
@@ -296,7 +323,7 @@ app.prepare().then(async () => {
           categories: categories || [],
           timer: null,
           timeRemaining: 30,
-          roundFound: false,
+          roundFinders: new Set(),
           deletionTimer: null,
         };
 
@@ -344,7 +371,7 @@ app.prepare().then(async () => {
         finalPseudo = `${pseudo}${suffix}`;
       }
 
-      const player = { id: socket.id, pseudo: finalPseudo, score: 0 };
+      const player = { id: socket.id, pseudo: finalPseudo, score: 0, hasFoundThisRound: false };
       room.players.push(player);
       socket.join(roomCode);
       currentRoom = roomCode;
@@ -402,6 +429,7 @@ app.prepare().then(async () => {
         isPublic: room.isPublic || false,
         startCountdownValue: room.startCountdownValue || null,
         isCountingDown: room.startCountdown !== null,
+        roundFinders: Array.from(room.roundFinders || []),
       });
     });
 
@@ -419,10 +447,13 @@ app.prepare().then(async () => {
 
         room.isPlaying = true;
         room.currentTrackIndex = 0;
-        room.roundFound = false;
+        room.roundFinders = new Set();
 
-        // Reset scores
-        room.players.forEach(p => p.score = 0);
+        // Reset scores et états
+        room.players.forEach(p => {
+          p.score = 0;
+          p.hasFoundThisRound = false;
+        });
 
         const currentTrack = room.tracks[room.currentTrackIndex];
         room.timeRemaining = currentTrack.timeLimit;
@@ -445,52 +476,113 @@ app.prepare().then(async () => {
       }
     });
 
-    // Soumettre une réponse
+    // Soumettre une réponse (style Skribbl.io)
     socket.on('game:answer', (answer) => {
       if (!currentRoom || !currentPseudo) return;
       const room = rooms.get(currentRoom);
-      if (!room || !room.isPlaying || room.roundFound) return;
+      if (!room || !room.isPlaying) return;
+
+      // Vérifier si ce joueur a déjà trouvé ce round
+      const alreadyFound = room.roundFinders.has(socket.id);
 
       const currentTrack = room.tracks[room.currentTrackIndex];
-      const isCorrect = checkAnswer(answer, currentTrack.acceptedAnswers);
+      // Ne pas vérifier si déjà trouvé
+      const isCorrect = !alreadyFound && checkAnswer(answer, currentTrack.acceptedAnswers);
 
-      // Broadcast la tentative à tous
-      io.to(currentRoom).emit('chat:message', {
+      // Créer le message
+      const chatMessage = {
         pseudo: currentPseudo,
         message: answer,
         isCorrect,
         playerId: socket.id,
-      });
+        isFromFinder: alreadyFound,
+      };
+
+      // ROUTING SÉLECTIF DES MESSAGES
+      if (alreadyFound) {
+        // Joueur qui a déjà trouvé : envoyer uniquement aux autres qui ont trouvé
+        room.roundFinders.forEach(finderId => {
+          io.to(finderId).emit('chat:message', chatMessage);
+        });
+      } else if (isCorrect) {
+        // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
+        const foundMessage = {
+          pseudo: currentPseudo,
+          message: 'a trouvé!',
+          isCorrect: true,
+          playerId: socket.id,
+          isFromFinder: false,
+        };
+        // Envoyer à tout le monde
+        io.to(currentRoom).emit('chat:message', foundMessage);
+      } else {
+        // Mauvaise réponse : envoyer à ceux qui n'ont pas trouvé
+        room.players.forEach(player => {
+          if (!room.roundFinders.has(player.id)) {
+            io.to(player.id).emit('chat:message', chatMessage);
+          }
+        });
+      }
 
       if (isCorrect) {
-        room.roundFound = true;
+        // Calculer le score basé sur le temps restant
+        const isFirstFinder = room.roundFinders.size === 0;
+        const scoreEarned = calculateScore(room.timeRemaining, currentTrack.timeLimit, isFirstFinder);
 
-        // Incrémenter le score
+        // Ajouter le joueur aux finders
+        room.roundFinders.add(socket.id);
+
+        // Mettre à jour le score du joueur
         const player = room.players.find(p => p.id === socket.id);
         if (player) {
-          player.score++;
+          player.score += scoreEarned;
+          player.hasFoundThisRound = true;
         }
 
-        // Arrêter le timer
-        if (room.timer) {
-          clearInterval(room.timer);
-          room.timer = null;
-        }
-
-        // Notifier tout le monde
-        io.to(currentRoom).emit('game:correct-answer', {
-          playerId: socket.id,
-          pseudo: currentPseudo,
-          title: currentTrack.title,
-          imageFile: currentTrack.imageFile,
-          players: room.players,
+        // Notification privée au joueur qui a trouvé
+        socket.emit('game:you-found', {
+          scoreEarned,
+          timeRemaining: room.timeRemaining,
+          isFirst: isFirstFinder,
         });
 
-        // Passer au track suivant après 3 secondes
-        if (room.isPublic) {
-          setTimeout(() => nextTrackPublic(room), 3000);
-        } else {
-          setTimeout(() => nextTrack(room, currentRoom, io), 3000);
+        // Notification publique à tous (sans révéler la réponse)
+        io.to(currentRoom).emit('game:player-found', {
+          playerId: socket.id,
+          pseudo: currentPseudo,
+          players: room.players,
+          findersCount: room.roundFinders.size,
+          totalPlayers: room.players.length,
+        });
+
+        // Si tout le monde a trouvé, passer à la musique suivante
+        if (room.roundFinders.size >= room.players.length) {
+          // Arrêter le timer
+          if (room.timer) {
+            clearInterval(room.timer);
+            room.timer = null;
+          }
+
+          // Émettre game:round-end immédiatement
+          const finders = Array.from(room.roundFinders).map(id => {
+            const p = room.players.find(player => player.id === id);
+            return p ? { id, pseudo: p.pseudo } : null;
+          }).filter(Boolean);
+
+          io.to(currentRoom).emit('game:round-end', {
+            title: currentTrack.title,
+            imageFile: currentTrack.imageFile,
+            finders,
+            players: room.players,
+            totalFound: room.roundFinders.size,
+          });
+
+          // Passer au suivant après 3 secondes
+          if (room.isPublic) {
+            setTimeout(() => nextTrackPublic(room), 3000);
+          } else {
+            setTimeout(() => nextTrack(room, currentRoom, io), 3000);
+          }
         }
       }
     });
@@ -603,16 +695,23 @@ app.prepare().then(async () => {
         clearInterval(room.timer);
         room.timer = null;
 
-        if (!room.roundFound) {
-          const currentTrack = room.tracks[room.currentTrackIndex];
-          io.to(roomCode).emit('game:time-up', {
-            title: currentTrack.title,
-            imageFile: currentTrack.imageFile,
-          });
+        // Fin du round - révéler la réponse à tous
+        const currentTrack = room.tracks[room.currentTrackIndex];
+        const finders = Array.from(room.roundFinders).map(id => {
+          const p = room.players.find(player => player.id === id);
+          return p ? { id, pseudo: p.pseudo } : null;
+        }).filter(Boolean);
 
-          // Passer au suivant après 3 secondes
-          setTimeout(() => nextTrack(room, roomCode, io), 3000);
-        }
+        io.to(roomCode).emit('game:round-end', {
+          title: currentTrack.title,
+          imageFile: currentTrack.imageFile,
+          finders,
+          players: room.players,
+          totalFound: room.roundFinders.size,
+        });
+
+        // Passer au suivant après 3 secondes
+        setTimeout(() => nextTrack(room, roomCode, io), 3000);
       }
     }, 1000);
   }
@@ -620,7 +719,8 @@ app.prepare().then(async () => {
   // Passer au track suivant
   function nextTrack(room, roomCode, io) {
     room.currentTrackIndex++;
-    room.roundFound = false;
+    room.roundFinders = new Set();
+    room.players.forEach(p => p.hasFoundThisRound = false);
 
     if (room.currentTrackIndex >= room.tracks.length) {
       // Fin de partie

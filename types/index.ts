@@ -42,6 +42,7 @@ export interface Player {
   id: string;
   pseudo: string;
   score: number;
+  hasFoundThisRound?: boolean;
 }
 
 export interface RoomState {
@@ -62,6 +63,7 @@ export interface RoomState {
   isPublic?: boolean;
   startCountdownValue?: number | null;
   isCountingDown?: boolean;
+  roundFinders?: string[];
 }
 
 export interface ChatMessage {
@@ -69,6 +71,7 @@ export interface ChatMessage {
   message: string;
   isCorrect: boolean;
   playerId: string;
+  isFromFinder?: boolean;
 }
 
 // Types Admin

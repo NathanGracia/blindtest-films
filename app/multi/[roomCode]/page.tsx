@@ -28,6 +28,12 @@ export default function MultiGameRoom() {
   const [finalScores, setFinalScores] = useState<Player[]>([]);
   const [publicCountdown, setPublicCountdown] = useState<number | null>(null);
 
+  // États pour le système de score Skribbl.io
+  const [hasFoundThisRound, setHasFoundThisRound] = useState(false);
+  const [myScoreThisRound, setMyScoreThisRound] = useState<number | null>(null);
+  const [findersCount, setFindersCount] = useState(0);
+  const [roundFinders, setRoundFinders] = useState<{id: string; pseudo: string}[]>([]);
+
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +154,12 @@ export default function MultiGameRoom() {
       setWinnerId(null);
       setResultImage(null);
       setIsFinished(false);
+      setInput('');
+      // Reset états Skribbl
+      setHasFoundThisRound(false);
+      setMyScoreThisRound(null);
+      setFindersCount(0);
+      setRoundFinders([]);
     });
 
     socket.on('game:tick', (time: number) => {
@@ -158,26 +170,32 @@ export default function MultiGameRoom() {
       setMessages((prev) => [...prev, msg]);
     });
 
-    socket.on('game:correct-answer', (data: { playerId: string; pseudo: string; title: string; imageFile?: string; players: Player[] }) => {
+    // Notification privée: tu as trouvé la réponse
+    socket.on('game:you-found', (data: { scoreEarned: number; timeRemaining: number; isFirst: boolean }) => {
+      setHasFoundThisRound(true);
+      setMyScoreThisRound(data.scoreEarned);
+    });
+
+    // Notification publique: quelqu'un a trouvé (sans révéler la réponse)
+    socket.on('game:player-found', (data: { playerId: string; pseudo: string; players: Player[]; findersCount: number; totalPlayers: number }) => {
+      setRoom((prev) => {
+        if (!prev) return prev;
+        return { ...prev, players: data.players };
+      });
+      setFindersCount(data.findersCount);
+    });
+
+    // Fin du round: révèle la réponse à tous
+    socket.on('game:round-end', (data: { title: string; imageFile?: string; finders: {id: string; pseudo: string}[]; players: Player[]; totalFound: number }) => {
       setShowResult(true);
       setResultTitle(data.title);
       setResultImage(data.imageFile || null);
-      setWinnerId(data.playerId);
-      setWinnerPseudo(data.pseudo);
+      setRoundFinders(data.finders);
       setIsPlaying(false);
       setRoom((prev) => {
         if (!prev) return prev;
         return { ...prev, players: data.players };
       });
-    });
-
-    socket.on('game:time-up', (data: { title: string; imageFile?: string }) => {
-      setShowResult(true);
-      setResultTitle(data.title);
-      setResultImage(data.imageFile || null);
-      setWinnerId(null);
-      setWinnerPseudo(null);
-      setIsPlaying(false);
     });
 
     socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
@@ -196,6 +214,12 @@ export default function MultiGameRoom() {
       setWinnerId(null);
       setResultImage(null);
       setIsPlaying(true);
+      setInput('');
+      // Reset états Skribbl
+      setHasFoundThisRound(false);
+      setMyScoreThisRound(null);
+      setFindersCount(0);
+      setRoundFinders([]);
     });
 
     socket.on('game:end', (data: { players: Player[] }) => {
@@ -224,8 +248,9 @@ export default function MultiGameRoom() {
       socket.off('game:start');
       socket.off('game:tick');
       socket.off('chat:message');
-      socket.off('game:correct-answer');
-      socket.off('game:time-up');
+      socket.off('game:you-found');
+      socket.off('game:player-found');
+      socket.off('game:round-end');
       socket.off('game:next');
       socket.off('game:end');
       socket.off('public:countdown');
@@ -253,7 +278,7 @@ export default function MultiGameRoom() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !isPlaying || showResult) return;
+    if (!input.trim() || !isPlaying || showResult || hasFoundThisRound) return;
 
     socketRef.current.emit('game:answer', input.trim());
     setInput('');
@@ -449,16 +474,52 @@ export default function MultiGameRoom() {
               />
             </div>
 
+            {/* Indicateur "Tu as trouvé" */}
+            {hasFoundThisRound && !showResult && (
+              <div className="glass rounded-xl p-4 text-center bg-[#7fba00]/20 border border-[#7fba00]/50">
+                <p className="text-[#7fba00] font-semibold text-lg">
+                  Tu as trouvé! +{myScoreThisRound} pts
+                </p>
+                <p className="text-white/60 text-sm mt-1">
+                  En attente de la fin du round...
+                </p>
+              </div>
+            )}
+
+            {/* Indicateur nombre de joueurs qui ont trouvé */}
+            {findersCount > 0 && !hasFoundThisRound && !showResult && (
+              <div className="glass rounded-xl p-3 text-center">
+                <p className="text-white/70">
+                  {findersCount} joueur{findersCount > 1 ? 's ont' : ' a'} trouvé!
+                </p>
+              </div>
+            )}
+
             {/* Résultat */}
             {showResult && (
               <div
                 className={`glass rounded-xl p-6 text-center ${
-                  winnerId ? 'glow-green' : ''
+                  roundFinders.length > 0 ? 'glow-green' : ''
                 }`}
               >
-                <p className={`text-xl font-semibold ${winnerId ? 'text-[#7fba00]' : 'text-red-400'}`}>
-                  {winnerId ? `✓ ${winnerPseudo} a trouvé !` : '✗ Temps écoulé !'}
-                </p>
+                {roundFinders.length > 0 ? (
+                  <>
+                    <p className="text-[#7fba00] text-xl font-semibold">
+                      {roundFinders.length === 1
+                        ? `✓ ${roundFinders[0].pseudo} a trouvé!`
+                        : `✓ ${roundFinders.length} joueurs ont trouvé!`}
+                    </p>
+                    {roundFinders.length > 1 && (
+                      <p className="text-white/60 text-sm mt-1">
+                        {roundFinders.map(f => f.pseudo).join(', ')}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-red-400 text-xl font-semibold">
+                    ✗ Personne n&apos;a trouvé!
+                  </p>
+                )}
 
                 {/* Image de révélation */}
                 {resultImage && (
@@ -518,14 +579,20 @@ export default function MultiGameRoom() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  disabled={!isPlaying || showResult}
-                  placeholder={isPlaying ? 'Devine la musique...' : 'En attente...'}
+                  disabled={!isPlaying || showResult || hasFoundThisRound}
+                  placeholder={
+                    hasFoundThisRound
+                      ? 'Tu as déjà trouvé!'
+                      : isPlaying
+                        ? 'Devine la musique...'
+                        : 'En attente...'
+                  }
                   className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
                   autoComplete="off"
                 />
                 <button
                   type="submit"
-                  disabled={!isPlaying || showResult || !input.trim()}
+                  disabled={!isPlaying || showResult || hasFoundThisRound || !input.trim()}
                   className="btn-aero px-6 py-3 text-white rounded-none border-0 border-l border-white/20 disabled:opacity-50"
                 >
                   Envoyer
@@ -540,7 +607,7 @@ export default function MultiGameRoom() {
               players={room.players}
               hostId={room.hostId}
               currentPlayerId={myId}
-              winnerId={winnerId || undefined}
+              roundFinders={room.roundFinders}
             />
           </div>
         </div>
