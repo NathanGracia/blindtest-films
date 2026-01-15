@@ -23,6 +23,15 @@ export default function GamePage() {
   const [wasCorrect, setWasCorrect] = useState(false);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastScore, setLastScore] = useState<number | null>(null);
+
+  // Calculer le score basé sur le temps restant
+  const calculateScore = (timeRemaining: number, timeLimit: number) => {
+    const MIN_SCORE = 100;
+    const MAX_SCORE = 1000;
+    const timeRatio = timeRemaining / timeLimit;
+    return Math.floor(MIN_SCORE + (MAX_SCORE - MIN_SCORE) * timeRatio);
+  };
 
   // Charger les tracks selon les catégories sélectionnées
   useEffect(() => {
@@ -109,7 +118,9 @@ export default function GamePage() {
     ]);
 
     if (isCorrect) {
-      setScore((prev) => prev + 1);
+      const earnedScore = calculateScore(timeRemaining, currentTrack.timeLimit);
+      setLastScore(earnedScore);
+      setScore((prev) => prev + earnedScore);
       setIsPlaying(false);
       setShowResult(true);
       setWasCorrect(true);
