@@ -16,7 +16,13 @@
       "Bash(taskkill:*)",
       "Bash(timeout /t 5 /nobreak)",
       "Bash(ping:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(set PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=oui je le veux:*)",
+      "Bash(cmd /c \"set PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=oui je le veux&& npx prisma migrate reset --force\")",
+      "Bash(python scripts/fixtures.py:*)",
+      "Bash(chcp 65001)",
+      "Bash(find:*)",
+      "Bash(python scripts/clear_tracks.py:*)"
     ]
   }
 }
