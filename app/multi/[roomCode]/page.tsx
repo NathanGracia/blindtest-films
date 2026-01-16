@@ -582,91 +582,93 @@ export default function MultiGameRoom() {
             )}
 
             {/* Chat / Réponses */}
-            <div className="glass rounded-xl overflow-hidden relative">
-              <div
-                ref={chatRef}
-                className="h-48 overflow-y-auto p-4 space-y-2"
-              >
-                {messages.length === 0 ? (
-                  <p className="text-white/40 text-center italic">
-                    Les réponses apparaîtront ici...
-                  </p>
-                ) : (
-                  messages.map((msg, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-start gap-2 ${
-                        msg.isCorrect ? 'animate-pulse bg-green-500/10 border border-green-500/30 rounded px-2 py-1' : ''
-                      } ${
-                        msg.isFromFinder ? 'opacity-90' : ''
-                      }`}
-                    >
-                      <span
-                        className={`font-semibold ${
-                          msg.isFromFinder
-                            ? 'text-[#4a90d9]'
-                            : msg.playerId === myId
-                              ? 'text-[#7ec8e3]'
-                              : 'text-[#4a90d9]'
+            <div className="relative">
+              <div className="glass rounded-xl overflow-hidden">
+                <div
+                  ref={chatRef}
+                  className="h-48 overflow-y-auto p-4 space-y-2"
+                >
+                  {messages.length === 0 ? (
+                    <p className="text-white/40 text-center italic">
+                      Les réponses apparaîtront ici...
+                    </p>
+                  ) : (
+                    messages.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-start gap-2 ${
+                          msg.isCorrect ? 'animate-pulse bg-green-500/10 border border-green-500/30 rounded px-2 py-1' : ''
+                        } ${
+                          msg.isFromFinder ? 'opacity-90' : ''
                         }`}
                       >
-                        {msg.pseudo}:
-                      </span>
-                      <span
-                        className={
-                          msg.isCorrect
-                            ? 'text-[#7fba00] font-bold'
-                            : msg.isFromFinder
-                              ? 'text-[#4a90d9]/90 italic'
-                              : 'text-white/70'
-                        }
-                      >
-                        {msg.message}
-                      </span>
-                      {msg.isCorrect && <span className="text-[#7fba00]">✓</span>}
-                      {msg.isFromFinder && (
-                        <span className="text-[#4a90d9] text-xs" title="Message d'un gagnant">
-                          👑
+                        <span
+                          className={`font-semibold ${
+                            msg.isFromFinder
+                              ? 'text-[#4a90d9]'
+                              : msg.playerId === myId
+                                ? 'text-[#7ec8e3]'
+                                : 'text-[#4a90d9]'
+                          }`}
+                        >
+                          {msg.pseudo}:
                         </span>
-                      )}
-                    </div>
-                  ))
-                )}
+                        <span
+                          className={
+                            msg.isCorrect
+                              ? 'text-[#7fba00] font-bold'
+                              : msg.isFromFinder
+                                ? 'text-[#4a90d9]/90 italic'
+                                : 'text-white/70'
+                          }
+                        >
+                          {msg.message}
+                        </span>
+                        {msg.isCorrect && <span className="text-[#7fba00]">✓</span>}
+                        {msg.isFromFinder && (
+                          <span className="text-[#4a90d9] text-xs" title="Message d'un gagnant">
+                            👑
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex border-t border-white/20">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={!isPlaying || showResult}
+                    placeholder={
+                      isPlaying
+                        ? 'Devine la musique...'
+                        : 'En attente...'
+                    }
+                    className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!isPlaying || showResult || !input.trim()}
+                    className="btn-aero px-6 py-3 text-white rounded-none border-0 border-l border-white/20 disabled:opacity-50"
+                  >
+                    Envoyer
+                  </button>
+                </form>
               </div>
 
-              {/* Message hint en bas du chat */}
+              {/* Message hint en bas */}
               {hintMessage && (
-                <div className="absolute bottom-0 left-0 right-0 bg-orange-500/20 border-t border-orange-500/50 px-4 py-2 backdrop-blur-sm">
-                  <p className="text-orange-300 font-semibold text-sm flex items-center gap-2">
+                <div className="absolute -bottom-16 left-0 right-0 glass rounded-xl p-3 bg-orange-500/20 border border-orange-500/50">
+                  <p className="text-orange-300 font-semibold text-sm flex items-center justify-center gap-2">
                     <span>💡</span>
                     {hintMessage}
                   </p>
                 </div>
               )}
-
-              <form onSubmit={handleSubmit} className="flex border-t border-white/20">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={!isPlaying || showResult}
-                  placeholder={
-                    isPlaying
-                      ? 'Devine la musique...'
-                      : 'En attente...'
-                  }
-                  className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
-                  autoComplete="off"
-                />
-                <button
-                  type="submit"
-                  disabled={!isPlaying || showResult || !input.trim()}
-                  className="btn-aero px-6 py-3 text-white rounded-none border-0 border-l border-white/20 disabled:opacity-50"
-                >
-                  Envoyer
-                </button>
-              </form>
             </div>
           </div>
 
