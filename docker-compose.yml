@@ -11,9 +11,9 @@ services:
       - API_BASE_URL=${API_BASE_URL:-http://localhost:3000}
       - IMPORT_API_TOKEN=${ADMIN_PASSWORD:-admin123}
     volumes:
-      # Persister les fichiers media (optionnel si vous voulez les garder entre redemarrages)
-      - audio_data:/app/public/audio
-      - images_data:/app/public/images
+      # On lie le dossier physique du VPS au dossier dans le conteneur
+      - ./public/audio:/app/public/audio
+      - ./public/images:/app/public/images
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
