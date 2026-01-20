@@ -41,6 +41,15 @@ def detect_ffmpeg():
     if ffmpeg:
         return ffmpeg
 
+    # Try static_ffmpeg package (installed via pip)
+    try:
+        import static_ffmpeg
+        ffmpeg_exe, _ = static_ffmpeg.run.get_or_fetch_platform_executables_else_raise()
+        if Path(ffmpeg_exe).exists():
+            return ffmpeg_exe
+    except (ImportError, Exception):
+        pass
+
     # Try common locations
     common_paths = [
         # Windows

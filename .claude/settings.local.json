@@ -22,7 +22,18 @@
       "Bash(python scripts/fixtures.py:*)",
       "Bash(chcp 65001)",
       "Bash(find:*)",
-      "Bash(python scripts/clear_tracks.py:*)"
+      "Bash(python scripts/clear_tracks.py:*)",
+      "Bash(set:*)",
+      "Bash(python -X utf8 scripts/fixtures.py:*)",
+      "Bash(python -m pip install:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(cmd /c \"ping -n 3 127.0.0.1 >nul && npx prisma generate\")",
+      "Bash(handle64:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"je veux une réinstall propre, et l'ajout des films dans la bdd\" npx prisma migrate reset:*)"
     ]
   }
 }
