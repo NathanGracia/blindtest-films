@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+__pycache__
+*.pyc
+.venv
+
+# Build output
+.next
+
+# Database (sera recree)
+prisma/*.db
+prisma/*.db-journal
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files (passer via docker-compose)
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage
+.nyc_output

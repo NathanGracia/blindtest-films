@@ -33,7 +33,11 @@
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
       "Bash(netstat:*)",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"je veux une réinstall propre, et l'ajout des films dans la bdd\" npx prisma migrate reset:*)"
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"je veux une réinstall propre, et l'ajout des films dans la bdd\" npx prisma migrate reset:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose down:*)"
     ]
   }
 }

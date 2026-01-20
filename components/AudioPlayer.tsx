@@ -17,7 +17,7 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
   const [showLoader, setShowLoader] = useState(false);
   const prevSrcRef = useRef<string>('');
   const hasSetStartTime = useRef(false);
-  const loaderTimeoutRef = useRef<NodeJS.Timeout>();
+  const loaderTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Reset state when src changes
   useEffect(() => {
