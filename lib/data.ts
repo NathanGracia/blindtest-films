@@ -12,6 +12,7 @@ function toTrack(dbTrack: {
   categoryId: string;
   timeLimit: number;
   startTime: number;
+  reportCount: number;
 }): Track {
   return {
     ...dbTrack,
@@ -168,4 +169,17 @@ export async function countTracksByCategory(): Promise<Record<string, number>> {
     result[count.categoryId] = count._count.id;
   }
   return result;
+}
+
+// Signaler un track (incrémenter le compteur de reports)
+export async function reportTrack(id: number): Promise<boolean> {
+  try {
+    await prisma.track.update({
+      where: { id },
+      data: { reportCount: { increment: 1 } },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -15,6 +15,7 @@ export default function TracksPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'default' | 'reports'>('default');
 
   useEffect(() => {
     loadData();
@@ -56,9 +57,17 @@ export default function TracksPage() {
     }
   };
 
-  const filteredTracks = filter
-    ? tracks.filter(t => t.categoryId === filter)
-    : tracks;
+  const filteredTracks = (() => {
+    let result = filter
+      ? tracks.filter(t => t.categoryId === filter)
+      : tracks;
+
+    if (sortBy === 'reports') {
+      result = [...result].sort((a, b) => (b.reportCount || 0) - (a.reportCount || 0));
+    }
+
+    return result;
+  })();
 
   if (loading) {
     return (
@@ -113,6 +122,25 @@ export default function TracksPage() {
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/10">
+          <span className="text-white/60 text-sm">Trier par :</span>
+          <button
+            onClick={() => setSortBy('default')}
+            className={`px-3 py-1 rounded-lg text-sm transition-all ${
+              sortBy === 'default' ? 'bg-[#4a90d9] text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Par défaut
+          </button>
+          <button
+            onClick={() => setSortBy('reports')}
+            className={`px-3 py-1 rounded-lg text-sm transition-all ${
+              sortBy === 'reports' ? 'bg-red-500 text-white' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Par signalements
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -142,6 +170,7 @@ export default function TracksPage() {
                 <th className="text-left p-4 text-white/60 font-medium">Catégorie</th>
                 <th className="text-left p-4 text-white/60 font-medium">Audio</th>
                 <th className="text-left p-4 text-white/60 font-medium">Image</th>
+                <th className="text-left p-4 text-white/60 font-medium">Reports</th>
                 <th className="text-right p-4 text-white/60 font-medium">Actions</th>
               </tr>
             </thead>
@@ -189,6 +218,15 @@ export default function TracksPage() {
                         <span className="text-[#7fba00]">✓</span>
                       ) : (
                         <span className="text-white/40">—</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      {(track.reportCount || 0) > 0 ? (
+                        <span className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-400 font-medium">
+                          {track.reportCount}
+                        </span>
+                      ) : (
+                        <span className="text-white/40">0</span>
                       )}
                     </td>
                     <td className="p-4 text-right">

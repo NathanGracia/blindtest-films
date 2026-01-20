@@ -7,6 +7,7 @@ import Timer from '@/components/Timer';
 import AudioPlayer from '@/components/AudioPlayer';
 import PlayerList from '@/components/PlayerList';
 import RevealImage from '@/components/RevealImage';
+import ReportButton from '@/components/ReportButton';
 import { Player, ChatMessage, RoomState } from '@/types';
 
 export default function MultiGameRoom() {
@@ -23,6 +24,7 @@ export default function MultiGameRoom() {
   const [resultTitle, setResultTitle] = useState('');
   const [resultTitleVF, setResultTitleVF] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
+  const [resultTrackId, setResultTrackId] = useState<number | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
@@ -194,11 +196,12 @@ export default function MultiGameRoom() {
     });
 
     // Fin du round: révèle la réponse à tous
-    socket.on('game:round-end', (data: { title: string; titleVF?: string; imageFile?: string; finders: {id: string; pseudo: string}[]; players: Player[]; totalFound: number }) => {
+    socket.on('game:round-end', (data: { trackId?: number; title: string; titleVF?: string; imageFile?: string; finders: {id: string; pseudo: string}[]; players: Player[]; totalFound: number }) => {
       setShowResult(true);
       setResultTitle(data.title);
       setResultTitleVF(data.titleVF || null);
       setResultImage(data.imageFile || null);
+      setResultTrackId(data.trackId || null);
       setRoundFinders(data.finders);
       setIsPlaying(false);
       setRoom((prev) => {
@@ -222,6 +225,7 @@ export default function MultiGameRoom() {
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
       setResultImage(null);
+      setResultTrackId(null);
       setIsPlaying(true);
       setInput('');
       // Reset états Skribbl
@@ -577,6 +581,11 @@ export default function MultiGameRoom() {
                   <p className="text-xl text-white/70 mt-1">
                     ({resultTitleVF})
                   </p>
+                )}
+                {resultTrackId && (
+                  <div className="mt-2">
+                    <ReportButton trackId={resultTrackId} />
+                  </div>
                 )}
               </div>
             )}

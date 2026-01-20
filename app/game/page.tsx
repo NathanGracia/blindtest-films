@@ -8,6 +8,7 @@ import AudioPlayer from '@/components/AudioPlayer';
 import AnswerInput from '@/components/AnswerInput';
 import ScoreBoard from '@/components/ScoreBoard';
 import RevealImage from '@/components/RevealImage';
+import ReportButton from '@/components/ReportButton';
 import { Track, Attempt } from '@/types';
 import { checkAnswer, isAnswerClose, shuffleArray } from '@/lib/utils';
 
@@ -271,6 +272,9 @@ export default function GamePage() {
                 ({currentTrack.titleVF})
               </p>
             )}
+            <div className="mt-2">
+              <ReportButton trackId={currentTrack.id} />
+            </div>
             <button
               onClick={nextTrack}
               className="btn-aero mt-6 px-8 py-3 text-white rounded-xl font-semibold"

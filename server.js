@@ -245,6 +245,7 @@ function startTimerPublic(room) {
 
       if (ioInstance) {
         ioInstance.to(PUBLIC_ROOM_CODE).emit('game:round-end', {
+          trackId: currentTrack.id,
           title: currentTrack.title,
           titleVF: currentTrack.titleVF,
           imageFile: currentTrack.imageFile,
@@ -642,6 +643,7 @@ app.prepare().then(async () => {
           }).filter(Boolean);
 
           io.to(currentRoom).emit('game:round-end', {
+            trackId: currentTrack.id,
             title: currentTrack.title,
             titleVF: currentTrack.titleVF,
             imageFile: currentTrack.imageFile,
@@ -776,6 +778,7 @@ app.prepare().then(async () => {
         }).filter(Boolean);
 
         io.to(roomCode).emit('game:round-end', {
+          trackId: currentTrack.id,
           title: currentTrack.title,
           titleVF: currentTrack.titleVF,
           imageFile: currentTrack.imageFile,

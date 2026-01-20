@@ -17,6 +17,7 @@ export interface Track {
   categoryId: string;
   timeLimit: number;
   startTime: number; // Seconde de départ de la musique
+  reportCount?: number; // Nombre de signalements
 }
 
 // Alias pour compatibilité (à supprimer progressivement)
