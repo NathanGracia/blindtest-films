@@ -1,27 +1,32 @@
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
+    # On ne publie plus le port 3000 vers l'extérieur, Caddy s'en charge en interne
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - OMDB_API_KEY=${OMDB_API_KEY}
       - DATABASE_URL=file:/app/prisma/prod.db
-      - API_BASE_URL=${API_BASE_URL:-http://localhost:3000}
-      - IMPORT_API_TOKEN=${ADMIN_PASSWORD:-admin123}
+      - API_BASE_URL=https://blindtest.nathangracia.com # Ton futur lien HTTPS
     volumes:
-      # On lie le dossier physique du VPS au dossier dans le conteneur
       - ./public/audio:/app/public/audio
       - ./public/images:/app/public/images
+      - ./prisma:/app/prisma
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
-  audio_data:
-  images_data:
+  caddy_data:
+  caddy_config:
