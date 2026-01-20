@@ -44,12 +44,12 @@ def download_image(url: str, output_path: Path) -> Optional[str]:
         print(f"  -> Image already exists: {output_path.name}")
         return f"/images/{output_path.name}"
 
+    # Define temp_path before try block to ensure it's available in except
+    temp_path = output_path.with_suffix('.tmp')
+
     try:
         response = requests.get(url, timeout=HTTP_TIMEOUT, stream=True)
         response.raise_for_status()
-
-        # Write to temporary file first
-        temp_path = output_path.with_suffix('.tmp')
         with open(temp_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)

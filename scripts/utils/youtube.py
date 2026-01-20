@@ -3,9 +3,27 @@ YouTube audio downloader using yt-dlp.
 Downloads theme songs and extracts audio to MP3.
 """
 
+import re
 import yt_dlp
 from pathlib import Path
 from typing import Optional
+
+
+def sanitize_search_query(query: str) -> str:
+    """
+    Sanitize search query to avoid URL scheme interpretation issues.
+
+    Args:
+        query: Raw search query
+
+    Returns:
+        Sanitized search query safe for yt-dlp
+    """
+    # Remove or replace characters that could be interpreted as URL schemes
+    # e.g., "Mission: Impossible" -> "Mission Impossible"
+    sanitized = re.sub(r':\s*', ' ', query)  # Replace ":" followed by optional space
+    sanitized = re.sub(r'\s+', ' ', sanitized)  # Collapse multiple spaces
+    return sanitized.strip()
 
 try:
     from scripts.config import AUDIO_DIR, FFMPEG_PATH, YOUTUBE_DOWNLOAD_TIMEOUT
@@ -66,9 +84,11 @@ class YouTubeDownloader:
             ydl_opts['ffmpeg_location'] = str(Path(self.ffmpeg_path).parent)
 
         try:
+            # Sanitize search query to avoid URL scheme issues (e.g., "Mission: Impossible")
+            safe_query = sanitize_search_query(search_query)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print(f"  -> Searching YouTube: {search_query}")
-                ydl.download([search_query])
+                print(f"  -> Searching YouTube: {safe_query}")
+                ydl.download([safe_query])
 
             # Verify file was created
             if output_path.exists():
