@@ -1,20 +1,30 @@
 services:
   app:
     build: .
-    # On ne publie plus le port 3000 vers l'extérieur, Caddy s'en charge en interne
+    # Caddy communique avec l'app sur le port 3000 en interne
     expose:
       - "3000"
     environment:
       - NODE_ENV=production
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - OMDB_API_KEY=${OMDB_API_KEY}
-      - DATABASE_URL=file:/app/prisma/prod.db
-      - API_BASE_URL=https://blindtest.nathangracia.com # Ton futur lien HTTPS
+      # Chemin absolu pour éviter l'erreur de parsing P1013
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - API_BASE_URL=https://blindtest.nathangracia.com
+      # On rajoute souvent cette variable pour Next.js en production
+      - NEXT_PUBLIC_API_URL=https://blindtest.nathangracia.com
     volumes:
+      # Montage des dossiers physiques pour l'audio, les images et la DB
       - ./public/audio:/app/public/audio
       - ./public/images:/app/public/images
       - ./prisma:/app/prisma
     restart: unless-stopped
+    # Le script de démarrage attendra que la DB soit prête
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   caddy:
     image: caddy:latest
@@ -26,6 +36,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+    # Caddy dépend du démarrage de l'app
+    depends_on:
+      - app
 
 volumes:
   caddy_data:
