@@ -38,7 +38,12 @@
       "Bash(docker-compose up:*)",
       "Bash(docker-compose logs:*)",
       "Bash(docker-compose down:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node_modules.binprisma generate)",
+      "Bash(while true)",
+      "Bash(do clear)",
+      "Bash(done)",
+      "Bash(ls:*)"
     ]
   }
 }

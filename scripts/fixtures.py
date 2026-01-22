@@ -14,16 +14,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.config import OMDB_API_KEY, API_BASE_URL, validate_config
 from scripts.importers.films import FilmsImporter
+from scripts.importers.cartoons import CartoonImporter
 
 
 # Map category names to importer classes
 IMPORTERS = {
     'films': FilmsImporter,
+    'dessins-animes': CartoonImporter,
     # Add more importers as they're implemented:
     # 'series': SeriesImporter,
     # 'jeux': JeuxImporter,
     # 'anime': AnimeImporter,
 }
+
+# Categories that don't need OMDb API key
+NO_OMDB_CATEGORIES = {'dessins-animes'}
 
 
 def print_stats(category: str, stats: dict):
@@ -80,8 +85,13 @@ def run_importer(
         print(f"Available categories: {', '.join(IMPORTERS.keys())}")
         sys.exit(1)
 
-    # Instantiate importer
-    importer = importer_class(omdb_api_key=api_key, api_base_url=api_url)
+    # Instantiate importer based on category
+    if category in NO_OMDB_CATEGORIES:
+        # Categories that don't need OMDb (like dessins-animes)
+        importer = importer_class(api_base_url=api_url)
+    else:
+        # Categories that need OMDb (like films)
+        importer = importer_class(omdb_api_key=api_key, api_base_url=api_url)
 
     # Run import
     stats = importer.import_all(skip_existing=skip_existing, max_items=limit)
@@ -161,16 +171,20 @@ Examples:
             print(f"  ⚠ {warning}")
         print()
 
-    # Get API key
-    api_key = args.api_key or OMDB_API_KEY
-    if not api_key:
-        print("Error: OMDb API key required.")
-        print("  Use --api-key or set OMDB_API_KEY environment variable.")
-        print("  Get a free key at: http://www.omdbapi.com/apikey.aspx")
-        sys.exit(1)
-
     # Get categories to import
     categories = args.categories if args.categories else list(IMPORTERS.keys())
+
+    # Get API key
+    api_key = args.api_key or OMDB_API_KEY
+
+    # Check if OMDb API key is needed
+    needs_omdb = any(cat not in NO_OMDB_CATEGORIES for cat in categories)
+    if needs_omdb and not api_key:
+        print("Error: OMDb API key required for selected categories.")
+        print("  Use --api-key or set OMDB_API_KEY environment variable.")
+        print("  Get a free key at: http://www.omdbapi.com/apikey.aspx")
+        print(f"\nNote: Categories that don't need OMDb: {', '.join(NO_OMDB_CATEGORIES)}")
+        sys.exit(1)
 
     # Validate categories
     invalid_categories = [c for c in categories if c not in IMPORTERS]

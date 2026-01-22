@@ -34,6 +34,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./public/audio:/app/public/audio   # Caddy accède aux MP3
+      - ./public/images:/app/public/images # Caddy accède aux Images
       - caddy_data:/data
       - caddy_config:/config
     # Caddy dépend du démarrage de l'app

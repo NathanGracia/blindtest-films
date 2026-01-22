@@ -22,5 +22,11 @@
     "name": "Anime",
     "icon": "sparkles",
     "color": "#00b4d8"
+  },
+  {
+    "id": "dessins-animes",
+    "name": "Dessins Animés",
+    "icon": "sparkles",
+    "color": "#ff6b9d"
   }
 ]

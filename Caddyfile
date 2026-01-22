@@ -1,3 +1,17 @@
 blindtest.nathangracia.com {
-    reverse_proxy app:3000
+    # Caddy sert les fichiers statiques en direct
+    handle_path /audio/* {
+        root * /app/public/audio
+        file_server
+    }
+    
+    handle_path /images/* {
+        root * /app/public/images
+        file_server
+    }
+
+    # Le reste va vers Next.js
+    handle {
+        reverse_proxy app:3000
+    }
 }

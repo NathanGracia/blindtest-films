@@ -26,9 +26,9 @@ def sanitize_search_query(query: str) -> str:
     return sanitized.strip()
 
 try:
-    from scripts.config import AUDIO_DIR, FFMPEG_PATH, YOUTUBE_DOWNLOAD_TIMEOUT
+    from scripts.config import AUDIO_DIR, IMAGES_DIR, FFMPEG_PATH, YOUTUBE_DOWNLOAD_TIMEOUT
 except ImportError:
-    from ..config import AUDIO_DIR, FFMPEG_PATH, YOUTUBE_DOWNLOAD_TIMEOUT
+    from ..config import AUDIO_DIR, IMAGES_DIR, FFMPEG_PATH, YOUTUBE_DOWNLOAD_TIMEOUT
 
 
 class YouTubeDownloader:
@@ -159,6 +159,111 @@ class YouTubeDownloader:
         except Exception as e:
             print(f"  [FAIL] Unexpected error: {e}")
             return None
+
+    def download_audio_with_thumbnail(self, search_query: str, filename: str) -> tuple[Optional[str], Optional[str]]:
+        """
+        Search YouTube and download both audio and thumbnail.
+
+        Args:
+            search_query: YouTube search query
+            filename: Output filename (without extension)
+
+        Returns:
+            Tuple of (audio_path, image_path), either can be None on failure
+            - audio_path: e.g., "/audio/filename.mp3"
+            - image_path: e.g., "/images/filename.jpg"
+        """
+        output_audio_path = self.output_dir / f"{filename}.mp3"
+        output_image_path = IMAGES_DIR / f"{filename}.jpg"
+
+        # Check if both already exist
+        if output_audio_path.exists() and output_image_path.exists():
+            print(f"  -> Audio and thumbnail already exist: {filename}.mp3, {filename}.jpg")
+            return f"/audio/{filename}.mp3", f"/images/{filename}.jpg"
+
+        # Check if only audio exists
+        if output_audio_path.exists() and not output_image_path.exists():
+            print(f"  -> Audio already exists: {filename}.mp3")
+            audio_path = f"/audio/{filename}.mp3"
+        else:
+            audio_path = None
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': str(self.output_dir / filename),
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'ytsearch1',  # Search YouTube, first result
+            'socket_timeout': YOUTUBE_DOWNLOAD_TIMEOUT,
+            'writethumbnail': True,  # Download thumbnail
+        }
+
+        # Add ffmpeg location if detected
+        if self.ffmpeg_path:
+            ydl_opts['ffmpeg_location'] = str(Path(self.ffmpeg_path).parent)
+
+        try:
+            # Sanitize search query to avoid URL scheme issues
+            safe_query = sanitize_search_query(search_query)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                print(f"  -> Searching YouTube: {safe_query}")
+                info = ydl.extract_info(safe_query, download=True)
+
+                # Get the actual video info (first result from search)
+                if 'entries' in info:
+                    video_info = info['entries'][0]
+                else:
+                    video_info = info
+
+                # Download thumbnail manually if not already done
+                if video_info.get('thumbnail'):
+                    thumbnail_url = video_info['thumbnail']
+                    # Try to download the best quality thumbnail
+                    if video_info.get('thumbnails'):
+                        # Get highest resolution thumbnail
+                        thumbnails = sorted(video_info['thumbnails'],
+                                          key=lambda t: t.get('height', 0) or 0,
+                                          reverse=True)
+                        if thumbnails:
+                            thumbnail_url = thumbnails[0]['url']
+
+                    # Download thumbnail using requests
+                    try:
+                        import requests
+                        response = requests.get(thumbnail_url, timeout=30)
+                        response.raise_for_status()
+                        with open(output_image_path, 'wb') as f:
+                            f.write(response.content)
+                        print(f"  [OK] Thumbnail downloaded: {filename}.jpg")
+                    except Exception as e:
+                        print(f"  [WARN] Could not download thumbnail: {e}")
+
+            # Verify audio file was created (if not already existing)
+            if not audio_path:
+                if output_audio_path.exists():
+                    print(f"  [OK] Audio downloaded: {filename}.mp3")
+                    audio_path = f"/audio/{filename}.mp3"
+                else:
+                    print(f"  [FAIL] Audio file not created: {filename}.mp3")
+
+            # Verify image file
+            image_path = None
+            if output_image_path.exists():
+                image_path = f"/images/{filename}.jpg"
+
+            return audio_path, image_path
+
+        except yt_dlp.utils.DownloadError as e:
+            print(f"  [FAIL] Download error: {e}")
+            return None, None
+        except Exception as e:
+            print(f"  [FAIL] Unexpected error: {e}")
+            return None, None
 
     def get_video_info(self, url: str) -> Optional[dict]:
         """
