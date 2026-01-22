@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Track, Category } from '@/types';
 
@@ -8,14 +8,27 @@ interface CategoryWithCount extends Category {
   trackCount: number;
 }
 
+type SortField = 'title' | 'category' | 'reports' | 'default';
+type SortDirection = 'asc' | 'desc';
+
 export default function TracksPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState('');
+
+  // Filtres et recherche
   const [filter, setFilter] = useState<string>('');
-  const [sortBy, setSortBy] = useState<'default' | 'reports'>('default');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Tri
+  const [sortField, setSortField] = useState<SortField>('default');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     loadData();
@@ -57,17 +70,83 @@ export default function TracksPage() {
     }
   };
 
-  const filteredTracks = (() => {
-    let result = filter
-      ? tracks.filter(t => t.categoryId === filter)
-      : tracks;
+  // Fonction de tri
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
-    if (sortBy === 'reports') {
-      result = [...result].sort((a, b) => (b.reportCount || 0) - (a.reportCount || 0));
+  // Filtrage, recherche, tri et pagination
+  const { filteredTracks, totalPages, displayRange } = useMemo(() => {
+    let result = [...tracks];
+
+    // Filtrer par catégorie
+    if (filter) {
+      result = result.filter(t => t.categoryId === filter);
     }
 
-    return result;
-  })();
+    // Recherche par titre
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(t =>
+        t.title.toLowerCase().includes(query) ||
+        t.titleVF?.toLowerCase().includes(query)
+      );
+    }
+
+    // Tri
+    if (sortField !== 'default') {
+      result.sort((a, b) => {
+        let aVal: any, bVal: any;
+
+        switch (sortField) {
+          case 'title':
+            aVal = a.title.toLowerCase();
+            bVal = b.title.toLowerCase();
+            break;
+          case 'category':
+            const catA = categories.find(c => c.id === a.categoryId);
+            const catB = categories.find(c => c.id === b.categoryId);
+            aVal = catA?.name.toLowerCase() || '';
+            bVal = catB?.name.toLowerCase() || '';
+            break;
+          case 'reports':
+            aVal = a.reportCount || 0;
+            bVal = b.reportCount || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Pagination
+    const total = result.length;
+    const pages = Math.ceil(total / itemsPerPage);
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginated = result.slice(start, end);
+
+    return {
+      filteredTracks: paginated,
+      totalPages: pages,
+      totalItems: total,
+      displayRange: { start: start + 1, end: Math.min(end, total), total }
+    };
+  }, [tracks, filter, searchQuery, sortField, sortDirection, currentPage, itemsPerPage, categories]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchQuery, itemsPerPage]);
 
   if (loading) {
     return (
@@ -95,10 +174,34 @@ export default function TracksPage() {
         </Link>
       </div>
 
-      {/* Filtres */}
-      <div className="glass rounded-xl p-4">
+      {/* Filtres et recherche */}
+      <div className="glass rounded-xl p-4 space-y-4">
+        {/* Barre de recherche */}
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="🔍 Rechercher par titre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/10 focus:border-[#7ec8e3] focus:outline-none transition-colors"
+            />
+          </div>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/10 focus:border-[#7ec8e3] focus:outline-none transition-colors"
+          >
+            <option value={10}>10 / page</option>
+            <option value={25}>25 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={100}>100 / page</option>
+          </select>
+        </div>
+
+        {/* Filtres catégories */}
         <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-white/60 text-sm">Filtrer par catégorie :</span>
+          <span className="text-white/60 text-sm">Catégorie :</span>
           <button
             onClick={() => setFilter('')}
             className={`px-3 py-1 rounded-lg text-sm transition-all ${
@@ -122,25 +225,6 @@ export default function TracksPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/10">
-          <span className="text-white/60 text-sm">Trier par :</span>
-          <button
-            onClick={() => setSortBy('default')}
-            className={`px-3 py-1 rounded-lg text-sm transition-all ${
-              sortBy === 'default' ? 'bg-[#4a90d9] text-white' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            Par défaut
-          </button>
-          <button
-            onClick={() => setSortBy('reports')}
-            className={`px-3 py-1 rounded-lg text-sm transition-all ${
-              sortBy === 'reports' ? 'bg-red-500 text-white' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            Par signalements
-          </button>
-        </div>
       </div>
 
       {error && (
@@ -149,28 +233,88 @@ export default function TracksPage() {
         </div>
       )}
 
+      {/* Stats */}
+      {displayRange && (
+        <div className="glass rounded-xl p-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/60">
+              Affichage de {displayRange.start} à {displayRange.end} sur {displayRange.total} résultat{displayRange.total > 1 ? 's' : ''}
+            </span>
+            {(searchQuery || filter) && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilter('');
+                }}
+                className="text-[#7ec8e3] hover:text-white transition-colors"
+              >
+                ✕ Réinitialiser les filtres
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="glass rounded-xl overflow-hidden">
         {filteredTracks.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-white/60 mb-4">
-              {filter ? 'Aucune musique dans cette catégorie' : 'Aucune musique'}
+              {searchQuery || filter ? 'Aucun résultat trouvé' : 'Aucune musique'}
             </p>
-            <Link
-              href="/admin/tracks/new"
-              className="btn-aero px-6 py-3 text-white rounded-xl inline-block"
-            >
-              Ajouter une musique
-            </Link>
+            {!searchQuery && !filter && (
+              <Link
+                href="/admin/tracks/new"
+                className="btn-aero px-6 py-3 text-white rounded-xl inline-block"
+              >
+                Ajouter une musique
+              </Link>
+            )}
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left p-4 text-white/60 font-medium">Titre</th>
-                <th className="text-left p-4 text-white/60 font-medium">Catégorie</th>
+              <tr className="border-b border-white/10 bg-white/5">
+                <th
+                  onClick={() => handleSort('title')}
+                  className="text-left p-4 text-white/60 font-medium cursor-pointer hover:text-white transition-colors select-none"
+                >
+                  <div className="flex items-center gap-2">
+                    Titre
+                    {sortField === 'title' && (
+                      <span className="text-[#7ec8e3]">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('category')}
+                  className="text-left p-4 text-white/60 font-medium cursor-pointer hover:text-white transition-colors select-none"
+                >
+                  <div className="flex items-center gap-2">
+                    Catégorie
+                    {sortField === 'category' && (
+                      <span className="text-[#7ec8e3]">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="text-left p-4 text-white/60 font-medium">Audio</th>
                 <th className="text-left p-4 text-white/60 font-medium">Image</th>
-                <th className="text-left p-4 text-white/60 font-medium">Reports</th>
+                <th
+                  onClick={() => handleSort('reports')}
+                  className="text-left p-4 text-white/60 font-medium cursor-pointer hover:text-white transition-colors select-none"
+                >
+                  <div className="flex items-center gap-2">
+                    Reports
+                    {sortField === 'reports' && (
+                      <span className="text-[#7ec8e3]">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
+                </th>
                 <th className="text-right p-4 text-white/60 font-medium">Actions</th>
               </tr>
             </thead>
@@ -269,6 +413,84 @@ export default function TracksPage() {
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="glass rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                currentPage === 1
+                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              ← Précédent
+            </button>
+
+            <div className="flex items-center gap-2">
+              {/* Première page */}
+              {currentPage > 3 && (
+                <>
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    className="w-10 h-10 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+                  >
+                    1
+                  </button>
+                  {currentPage > 4 && <span className="text-white/40">...</span>}
+                </>
+              )}
+
+              {/* Pages autour de la page courante */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                if (pageNum > totalPages) return null;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-10 h-10 rounded-lg transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-[#7ec8e3] text-white font-semibold'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              {/* Dernière page */}
+              {currentPage < totalPages - 2 && (
+                <>
+                  {currentPage < totalPages - 3 && <span className="text-white/40">...</span>}
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="w-10 h-10 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                currentPage === totalPages
+                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              Suivant →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
