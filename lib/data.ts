@@ -183,3 +183,16 @@ export async function reportTrack(id: number): Promise<boolean> {
     return false;
   }
 }
+
+// Réinitialiser le compteur de reports d'un track
+export async function resetReportCount(id: number): Promise<boolean> {
+  try {
+    await prisma.track.update({
+      where: { id },
+      data: { reportCount: 0 },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

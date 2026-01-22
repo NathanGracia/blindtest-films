@@ -70,6 +70,29 @@ export default function TracksPage() {
     }
   };
 
+  const handleResetReports = async (id: number) => {
+    setError('');
+    try {
+      const res = await fetch(`/api/admin/tracks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset-reports' }),
+      });
+
+      if (res.ok) {
+        // Mettre à jour le track dans la liste
+        setTracks(tracks.map(t =>
+          t.id === id ? { ...t, reportCount: 0 } : t
+        ));
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Erreur lors du reset');
+      }
+    } catch {
+      setError('Erreur de connexion');
+    }
+  };
+
   // Fonction de tri
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -365,13 +388,24 @@ export default function TracksPage() {
                       )}
                     </td>
                     <td className="p-4">
-                      {(track.reportCount || 0) > 0 ? (
-                        <span className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-400 font-medium">
-                          {track.reportCount}
-                        </span>
-                      ) : (
-                        <span className="text-white/40">0</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {(track.reportCount || 0) > 0 ? (
+                          <>
+                            <span className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-400 font-medium">
+                              {track.reportCount}
+                            </span>
+                            <button
+                              onClick={() => handleResetReports(track.id)}
+                              className="px-2 py-1 text-xs rounded bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
+                              title="Réinitialiser les signalements"
+                            >
+                              ↻
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-white/40">0</span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">

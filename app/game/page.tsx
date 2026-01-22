@@ -108,6 +108,21 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [isPlaying, showResult, currentTrack]);
 
+  // Gérer la touche Entrée pour passer à la musique suivante
+  useEffect(() => {
+    if (!showResult) return;
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        nextTrack();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showResult, nextTrack]);
+
   // Soumettre une réponse
   const handleSubmit = (answer: string) => {
     if (!currentTrack || showResult) return;
@@ -280,6 +295,7 @@ export default function GamePage() {
               className="btn-aero mt-6 px-8 py-3 text-white rounded-xl font-semibold"
             >
               {currentIndex + 1 >= tracks.length ? '📊 Voir le score' : '➡️ Musique suivante'}
+              <span className="ml-2 text-sm opacity-60">(Entrée)</span>
             </button>
           </div>
         )}

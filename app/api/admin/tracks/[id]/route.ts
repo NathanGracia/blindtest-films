@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTrackById, updateTrack, deleteTrack, readCategories } from '@/lib/data';
+import { getTrackById, updateTrack, deleteTrack, readCategories, resetReportCount } from '@/lib/data';
 
 export async function GET(
   request: Request,
@@ -80,6 +80,32 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Erreur suppression track:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    // Reset report count si demandé
+    if (body.action === 'reset-reports') {
+      const success = await resetReportCount(parseInt(id, 10));
+
+      if (!success) {
+        return NextResponse.json({ error: 'Musique non trouvée' }, { status: 404 });
+      }
+
+      return NextResponse.json({ success: true, reportCount: 0 });
+    }
+
+    return NextResponse.json({ error: 'Action non reconnue' }, { status: 400 });
+  } catch (error) {
+    console.error('Erreur PATCH track:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
