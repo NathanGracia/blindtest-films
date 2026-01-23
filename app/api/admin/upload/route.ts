@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { normalizeAudioFile } from '@/lib/audio-utils';
 
 const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'];
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -60,6 +61,17 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     await writeFile(absolutePath, buffer);
+
+    // Normaliser l'audio si c'est un fichier audio
+    if (type === 'audio') {
+      try {
+        await normalizeAudioFile(absolutePath);
+        console.log('Audio normalisé:', relativePath);
+      } catch (error) {
+        console.error('Erreur lors de la normalisation audio:', error);
+        // Continue même si la normalisation échoue
+      }
+    }
 
     return NextResponse.json({
       success: true,

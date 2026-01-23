@@ -121,9 +121,10 @@ python scripts/fixtures.py --categories films series
 1. ✅ Récupère les métadonnées depuis OMDb API
 2. ✅ Télécharge l'image du poster
 3. ✅ Cherche et télécharge l'audio depuis YouTube
-4. ✅ Génère automatiquement les variations de réponses acceptées
-5. ✅ Crée le track dans la base de données
-6. ✅ Skip automatiquement les films déjà importés
+4. ✅ **Normalise automatiquement l'audio à -16 LUFS** (volume cohérent)
+5. ✅ Génère automatiquement les variations de réponses acceptées
+6. ✅ Crée le track dans la base de données
+7. ✅ Skip automatiquement les films déjà importés
 
 **Résultat :**
 - Audio : `public/audio/nom-du-film.mp3`
@@ -159,6 +160,79 @@ python scripts/fixtures.py --categories films --verbose
 
 # Dry run (prévisualisation sans import)
 python scripts/fixtures.py --categories films --dry-run
+```
+
+## 🔊 Normalisation audio
+
+Le projet inclut un système de normalisation audio pour garantir un volume cohérent entre tous les MP3.
+
+### Pourquoi normaliser ?
+
+Les sources YouTube ont des volumes très hétérogènes. Sans normalisation, certains extraits sont beaucoup plus forts que d'autres, ce qui crée une expérience frustrante pour les joueurs.
+
+### Technologie utilisée
+
+- **Standard LUFS** (Loudness Units Full Scale) : norme de l'industrie du streaming
+- **Target -16 LUFS** : même standard que YouTube, Spotify, Netflix
+- **FFmpeg loudnorm filter** : normalisation perceptuelle (perception humaine du volume)
+- **Préservation de la qualité** : MP3 192 kbps, pas de perte
+
+### Auto-normalisation des nouveaux imports
+
+✅ **Tous les nouveaux MP3 sont automatiquement normalisés** lors de l'import via `fixtures.py`.
+
+Vous verrez ce message dans les logs :
+```
+[OK] Audio normalized to -16 LUFS
+```
+
+### Normaliser les fichiers existants
+
+Si vous avez déjà des MP3 importés avant cette feature, normalisez-les :
+
+```bash
+# Normaliser tous les MP3 dans public/audio/
+python scripts/normalize_existing.py
+```
+
+**Ce que fait le script :**
+- ✅ Scan de tous les MP3 dans `public/audio/`
+- ✅ Backup automatique des originaux dans `public/audio/.originals/`
+- ✅ Normalisation à -16 LUFS (standard streaming)
+- ✅ Progress bar en temps réel
+- ✅ Rapport détaillé (processed/failed/skipped)
+
+**Durée estimée :** ~6-12 minutes pour 358 fichiers
+
+### Options de normalisation
+
+```bash
+# Preview sans modifier les fichiers
+python scripts/normalize_existing.py --dry-run
+
+# Target LUFS personnalisé (-14 pour YouTube/Spotify standard)
+python scripts/normalize_existing.py --target-level -14
+
+# Sans backup des originaux (non recommandé)
+python scripts/normalize_existing.py --no-backup
+
+# Verbose (voir les détails de normalisation)
+python scripts/normalize_existing.py --verbose
+
+# Normaliser un dossier spécifique
+python scripts/normalize_existing.py --directory public/audio/test
+```
+
+### Restaurer les originaux
+
+Les fichiers originaux sont sauvegardés dans `public/audio/.originals/` :
+
+```bash
+# Restaurer un fichier spécifique
+cp public/audio/.originals/winx.mp3 public/audio/winx.mp3
+
+# Restaurer tous les fichiers
+cp public/audio/.originals/*.mp3 public/audio/
 ```
 
 ## 🎮 Lancement de l'application
@@ -313,6 +387,17 @@ python scripts/clear_tracks.py
 # Ré-importer
 python scripts/fixtures.py --categories films
 ```
+
+### Volume audio incohérent
+
+Si certains MP3 sont trop forts ou trop faibles :
+
+```bash
+# Normaliser tous les MP3 existants
+python scripts/normalize_existing.py
+```
+
+Les nouveaux imports sont automatiquement normalisés.
 
 ## 📝 Ajouter de nouveaux films
 

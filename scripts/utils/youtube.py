@@ -46,6 +46,48 @@ class YouTubeDownloader:
         self.ffmpeg_path = ffmpeg_path or FFMPEG_PATH
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+    def normalize_audio_file(self, file_path: Path) -> bool:
+        """
+        Normalize audio file to -16 LUFS.
+
+        Args:
+            file_path: Path to MP3 file
+
+        Returns:
+            True if normalized successfully, False otherwise
+        """
+        try:
+            from ffmpeg_normalize import FFmpegNormalize
+
+            temp_output = file_path.with_suffix('.normalized.mp3')
+
+            normalizer = FFmpegNormalize(
+                normalization_type='ebu',       # EBU R128 (LUFS)
+                target_level=-16.0,             # -16 LUFS (streaming standard)
+                audio_codec='libmp3lame',       # MP3 output
+                audio_bitrate='192k',           # Same bitrate
+                sample_rate=44100,              # Standard audio
+            )
+
+            normalizer.add_media_file(str(file_path), str(temp_output))
+            normalizer.run_normalization()
+
+            # Replace original with normalized
+            if temp_output.exists():
+                temp_output.replace(file_path)
+                print(f"  [OK] Audio normalized to -16 LUFS")
+                return True
+            else:
+                print(f"  [WARN] Normalization failed: output file not created")
+                return False
+
+        except ImportError:
+            print(f"  [WARN] ffmpeg-normalize not installed, skipping normalization")
+            return False
+        except Exception as e:
+            print(f"  [WARN] Normalization failed: {e}")
+            return False
+
     def download_audio(self, search_query: str, filename: str) -> Optional[str]:
         """
         Search YouTube and download audio as MP3.
@@ -93,6 +135,10 @@ class YouTubeDownloader:
             # Verify file was created
             if output_path.exists():
                 print(f"  [OK] Audio downloaded: {filename}.mp3")
+
+                # Normalize audio to -16 LUFS
+                self.normalize_audio_file(output_path)
+
                 return f"/audio/{filename}.mp3"
             else:
                 print(f"  [FAIL] Audio file not created: {filename}.mp3")
@@ -148,6 +194,10 @@ class YouTubeDownloader:
             # Verify file was created
             if output_path.exists():
                 print(f"  [OK] Audio downloaded: {filename}.mp3")
+
+                # Normalize audio to -16 LUFS
+                self.normalize_audio_file(output_path)
+
                 return f"/audio/{filename}.mp3"
             else:
                 print(f"  [FAIL] Audio file not created: {filename}.mp3")
@@ -247,6 +297,10 @@ class YouTubeDownloader:
             if not audio_path:
                 if output_audio_path.exists():
                     print(f"  [OK] Audio downloaded: {filename}.mp3")
+
+                    # Normalize audio to -16 LUFS
+                    self.normalize_audio_file(output_audio_path)
+
                     audio_path = f"/audio/{filename}.mp3"
                 else:
                     print(f"  [FAIL] Audio file not created: {filename}.mp3")

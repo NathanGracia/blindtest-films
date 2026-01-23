@@ -4,3 +4,4 @@ python-slugify>=8.0.0
 python-dotenv>=1.0.0
 tqdm>=4.66.0
 static-ffmpeg>=3.0
+ffmpeg-normalize>=1.28.0
