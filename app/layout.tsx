@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BlindTest Films",
+  title: "Blindtest",
   description: "Devine les films à partir de leurs musiques !",
 };
 

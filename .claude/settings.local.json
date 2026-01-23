@@ -43,7 +43,8 @@
       "Bash(while true)",
       "Bash(do clear)",
       "Bash(done)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Skill(frontend-design)"
     ]
   }
 }

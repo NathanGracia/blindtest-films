@@ -28,14 +28,26 @@ body {
   min-height: 100vh;
 }
 
-/* Frutiger Aero Aurora Background */
+/* Frutiger Aero Background - Cyan/Green Vista style */
 .aero-bg {
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(74, 144, 217, 0.4) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 30%, rgba(0, 180, 216, 0.3) 0%, transparent 50%),
-    radial-gradient(ellipse at 40% 80%, rgba(127, 186, 0, 0.3) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 90%, rgba(126, 200, 227, 0.2) 0%, transparent 50%),
-    linear-gradient(180deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+    /* Soleil en haut à droite */
+    radial-gradient(circle at 85% 8%, rgba(255, 255, 240, 0.5) 0%, transparent 25%),
+    /* Bulles transparentes */
+    radial-gradient(circle at 12% 25%, rgba(255, 255, 255, 0.15) 0%, transparent 8%),
+    radial-gradient(circle at 88% 20%, rgba(255, 255, 255, 0.12) 0%, transparent 6%),
+    radial-gradient(circle at 25% 65%, rgba(255, 255, 255, 0.18) 0%, transparent 7%),
+    radial-gradient(circle at 75% 55%, rgba(255, 255, 255, 0.1) 0%, transparent 5%),
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.12) 0%, transparent 6%),
+    radial-gradient(circle at 8% 80%, rgba(255, 255, 255, 0.14) 0%, transparent 5%),
+    radial-gradient(circle at 92% 75%, rgba(255, 255, 255, 0.1) 0%, transparent 4%),
+    /* Halos colorés */
+    radial-gradient(ellipse at 20% 20%, rgba(0, 210, 255, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(0, 200, 220, 0.25) 0%, transparent 45%),
+    radial-gradient(ellipse at 30% 80%, rgba(100, 200, 100, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, rgba(80, 180, 80, 0.25) 0%, transparent 45%),
+    /* Dégradé principal cyan → vert */
+    linear-gradient(180deg, #00a0c8 0%, #00b8b8 35%, #40a860 70%, #308048 100%);
   background-attachment: fixed;
 }
 
@@ -43,13 +55,13 @@ body {
 .glass {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.2) 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 100%
+    rgba(0, 30, 40, 0.4) 0%,
+    rgba(0, 25, 35, 0.2) 50%,
+    rgba(0, 20, 30, 0.1) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),

@@ -424,7 +424,7 @@ export default function MultiGameRoom() {
             )}
             {room.isPublic && (
               <p className="text-white/50 text-sm mt-2">
-                25 musiques aléatoires • Partie classée
+                25 musiques aléatoires
               </p>
             )}
           </div>

@@ -1,0 +1,202 @@
+# CLAUDE.md - Blindtest Films
+
+## Apercu rapide
+
+Application de blindtest musical pour films/series/jeux/anime. Style Skribbl.io avec modes solo et multijoueur temps reel.
+
+**Stack** : Next.js 16 + React 19 + Socket.IO + Prisma SQLite + Tailwind CSS + Python (import)
+
+---
+
+## Commandes essentielles
+
+```bash
+# Developpement
+npm run dev              # Serveur dev (port 3000) - inclut Socket.IO
+npm run build            # Build production
+npm start                # Serveur production
+
+# Base de donnees
+npx prisma studio        # Interface graphique DB (localhost:5555)
+npx prisma migrate dev   # Creer migration
+npx prisma db seed       # Init categories
+
+# Import de contenu (Python)
+python scripts/fixtures.py --categories films              # Importer films
+python scripts/fixtures.py --categories films --limit 10   # Limiter
+python scripts/clear_tracks.py                             # Vider tracks
+
+# Docker
+docker-compose up -d     # Lancer app + Caddy HTTPS
+```
+
+---
+
+## Architecture du projet
+
+```
+blindtest-films/
+├── app/                          # Next.js App Router
+│   ├── page.tsx                 # Accueil (selection categories)
+│   ├── game/page.tsx            # Mode Solo
+│   ├── multi/
+│   │   ├── page.tsx             # Lobby multijoueur
+│   │   └── [roomCode]/page.tsx  # Salle de jeu (WebSocket)
+│   ├── admin/                   # Interface admin protegee
+│   │   ├── tracks/              # CRUD tracks
+│   │   └── categories/          # CRUD categories
+│   └── api/
+│       ├── tracks/route.ts      # GET tracks publics
+│       ├── categories/route.ts  # GET categories
+│       ├── auth/                # Login/logout admin
+│       └── admin/               # Routes admin protegees
+│
+├── components/                  # Composants React
+│   ├── AudioPlayer.tsx         # Lecteur audio + disque anime
+│   ├── AnswerInput.tsx         # Input + historique tentatives
+│   ├── Timer.tsx               # Barre temps restant
+│   ├── CategorySelector.tsx    # Selection categories
+│   └── admin/                  # Composants admin
+│
+├── lib/
+│   ├── data.ts                 # CRUD Prisma
+│   ├── auth.ts                 # Gestion sessions admin
+│   ├── socket.ts               # Client Socket.IO singleton
+│   ├── prisma.ts               # Instance Prisma
+│   └── utils.ts                # Levenshtein, normalisation, shuffle
+│
+├── prisma/
+│   ├── schema.prisma           # Schema DB
+│   └── dev.db                  # Base SQLite
+│
+├── public/
+│   ├── audio/                  # Fichiers MP3
+│   └── images/                 # Affiches films
+│
+├── scripts/                    # Import Python
+│   ├── fixtures.py             # Orchestrateur principal
+│   ├── data/films_list.json    # Liste films a importer
+│   └── utils/                  # OMDb, YouTube, answers
+│
+├── server.js                   # Serveur Node + Socket.IO
+├── middleware.ts               # Protection routes admin
+└── docker-compose.yml          # Orchestration Docker
+```
+
+---
+
+## Schema base de donnees
+
+```prisma
+model Category {
+  id     String  @id          // "films", "series", "jeux", "anime"
+  name   String               // "Films"
+  icon   String               // "film"
+  color  String               // "#4a90d9"
+  tracks Track[]
+}
+
+model Track {
+  id              Int      @id @default(autoincrement())
+  title           String                  // Titre VO
+  titleVF         String?                 // Titre VF (optionnel)
+  acceptedAnswers String                  // JSON: ["reponse1","reponse2"]
+  audioFile       String                  // /audio/film-123.mp3
+  imageFile       String?                 // /images/film-123.jpg
+  timeLimit       Int      @default(30)   // Secondes
+  startTime       Int      @default(0)    // Debut lecture audio
+  reportCount     Int      @default(0)    // Signalements
+  categoryId      String
+  category        Category @relation(...)
+}
+```
+
+---
+
+## Logique metier cle
+
+### Systeme de score
+```
+score = 100 + (800 * tempsRestant / tempsMax)
+// Max: 1000 (instantane), Min: 100 (temps ecoule)
+// Multijoueur: +200 bonus premier a trouver
+```
+
+### Verification reponses (lib/utils.ts)
+1. Normalisation : minuscules, sans accents, trim
+2. Match exact dans `acceptedAnswers`
+3. Distance Levenshtein <= 2 : affiche "Vous etes proche !"
+
+### Multijoueur (server.js)
+- Room publique "PUBLIC" : permanente, 25 tracks, countdown 30s
+- Rooms privees : code 6 caracteres (ABC123)
+- Events Socket.IO : `room:join`, `game:start`, `game:tick`, `game:round-end`, `game:end`
+
+---
+
+## Routes API principales
+
+```
+# Publiques
+GET  /api/tracks?categories=films,series   # Tracks filtres
+GET  /api/categories                       # Categories avec counts
+POST /api/tracks/[id]/report               # Signaler track
+
+# Admin (protegees par middleware)
+GET/POST   /api/admin/tracks               # CRUD tracks
+GET/PATCH/DELETE /api/admin/tracks/[id]
+GET/POST   /api/admin/categories           # CRUD categories
+POST       /api/admin/upload               # Upload audio/images
+POST       /api/auth/login                 # Connexion admin
+```
+
+---
+
+## Variables d'environnement
+
+```env
+DATABASE_URL="file:./dev.db"
+ADMIN_PASSWORD=xxx           # Mot de passe interface admin
+OMDB_API_KEY=xxx             # API OMDb (metadonnees films)
+IMPORT_API_TOKEN=xxx         # Token scripts Python (defaut: ADMIN_PASSWORD)
+```
+
+---
+
+## Conventions de code
+
+- **TypeScript strict** : types explicites, interfaces pour structures (Category, Track, Player, RoomState)
+- **React** : `'use client'` pour composants interactifs, useCallback pour optimisation
+- **Tailwind** : classes utilitaires, design Frutiger Aero (`.glass`, `.btn-aero`, `.glow-blue`)
+- **API routes** : `NextResponse.json({ error }, { status })` pour erreurs
+- **Nommage** : PascalCase composants, camelCase variables, UPPER_SNAKE_CASE constantes
+
+---
+
+## Points d'attention
+
+1. **server.js** gere Socket.IO - ne pas confondre avec les API routes Next.js
+2. **middleware.ts** protege `/admin` et `/api/admin` - verifie cookie `blindtest_admin_session`
+3. **acceptedAnswers** est stocke en JSON string, pas en array natif
+4. **Scripts Python** necessitent le serveur Next.js lance (pour POST /api/import)
+5. **public/audio** et **public/images** sont volumineux et montes en volumes Docker
+
+---
+
+## Flux de jeu
+
+### Solo
+```
+Accueil → Selection categories (sessionStorage) → /game
+→ Fetch tracks → Shuffle → AudioPlayer + Timer
+→ Saisie reponse → Verification locale → Score
+→ Revele image → Track suivant → Fin partie
+```
+
+### Multijoueur
+```
+/multi → Pseudo + categories → room:create ou room:join
+→ /multi/[roomCode] → Socket listeners
+→ game:start → game:tick → Reponses broadcast
+→ game:round-end → game:end → Classement final
+```

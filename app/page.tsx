@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import CategorySelector from '@/components/CategorySelector';
 
 export default function Home() {
@@ -30,8 +31,8 @@ export default function Home() {
         <div className="text-center max-w-lg w-full">
           {/* Logo / Title */}
           <div className="mb-8">
-            <div className="glass rounded-full w-28 h-28 mx-auto mb-5 flex items-center justify-center glow-blue">
-              <span className="text-5xl">🎵</span>
+            <div className="w-28 h-28 mx-auto mb-5 flex items-center justify-center">
+              <Image src="/logo.png" alt="Blindtest" width={112} height={112} className="drop-shadow-lg" />
             </div>
             <h1 className="text-5xl font-bold text-white mb-3 text-glow tracking-wide">
               BlindTest
@@ -59,9 +60,10 @@ export default function Home() {
           <div className="mb-6">
             <Link
               href="/multi"
-              className="btn-aero block w-full px-8 py-4 text-white text-xl font-semibold rounded-xl"
+              className="btn-aero flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl"
             >
-              👥 Multijoueur
+              <Image src="/icons/multi.png" alt="" width={32} height={32} />
+              Multijoueur
             </Link>
           </div>
 
