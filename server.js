@@ -59,8 +59,20 @@ const rooms = new Map();
 async function createPublicRoom() {
   try {
     const allTracks = await loadTracks();
-    const shuffled = shuffleArray(allTracks);
-    const limitedTracks = shuffled.slice(0, 25); // Limiter à 25 œuvres
+
+    // Grouper par catégorie
+    const tracksPerCategory = {};
+    for (const track of allTracks) {
+      if (!tracksPerCategory[track.categoryId]) {
+        tracksPerCategory[track.categoryId] = [];
+      }
+      tracksPerCategory[track.categoryId].push(track);
+    }
+
+    // Distribution équitable entre toutes les catégories disponibles
+    const allCategories = Object.keys(tracksPerCategory);
+    const limitedTracks = distributeTracksEquitably(allCategories, 25, tracksPerCategory);
+
     const publicRoom = {
       code: PUBLIC_ROOM_CODE,
       players: [],
@@ -78,7 +90,7 @@ async function createPublicRoom() {
       startCountdownValue: 15,
     };
     rooms.set(PUBLIC_ROOM_CODE, publicRoom);
-    console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${limitedTracks.length} tracks`);
+    console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${limitedTracks.length} tracks répartis équitablement`);
     return publicRoom;
   } catch (error) {
     console.error('Erreur création room publique:', error);
@@ -227,8 +239,19 @@ async function startPublicGame(room) {
 
   try {
     const allTracks = await loadTracks();
-    const shuffled = shuffleArray(allTracks);
-    room.tracks = shuffled.slice(0, 25); // Limiter à 25 œuvres
+
+    // Grouper par catégorie
+    const tracksPerCategory = {};
+    for (const track of allTracks) {
+      if (!tracksPerCategory[track.categoryId]) {
+        tracksPerCategory[track.categoryId] = [];
+      }
+      tracksPerCategory[track.categoryId].push(track);
+    }
+
+    // Distribution équitable entre toutes les catégories
+    const allCategories = Object.keys(tracksPerCategory);
+    room.tracks = distributeTracksEquitably(allCategories, 25, tracksPerCategory);
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
@@ -395,6 +418,12 @@ app.prepare().then(async () => {
         callback = categories;
         categories = null;
         maxRounds = null;
+      }
+
+      // Vérifier que callback est une fonction
+      if (typeof callback !== 'function') {
+        console.error('room:create appelé sans callback valide');
+        return;
       }
 
       try {

@@ -92,12 +92,13 @@ export default function GamePage() {
 
   // Passer au track suivant
   const nextTrack = useCallback(() => {
+    // Arrêter la musique actuelle
+    setIsPlaying(false);
     setShowResult(false);
     setAttempts([]);
 
     if (currentIndex + 1 >= tracks.length) {
       setIsFinished(true);
-      setIsPlaying(false);
     } else {
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
@@ -113,7 +114,6 @@ export default function GamePage() {
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          setIsPlaying(false);
           setShowResult(true);
           setWasCorrect(false);
           return 0;
@@ -155,7 +155,6 @@ export default function GamePage() {
       const earnedScore = calculateScore(timeRemaining, currentTrack.timeLimit);
       setLastScore(earnedScore);
       setScore((prev) => prev + earnedScore);
-      setIsPlaying(false);
       setShowResult(true);
       setWasCorrect(true);
       setHintMessage(null);

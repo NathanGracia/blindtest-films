@@ -203,7 +203,6 @@ export default function MultiGameRoom() {
       setResultImage(data.imageFile || null);
       setResultTrackId(data.trackId || null);
       setRoundFinders(data.finders);
-      setIsPlaying(false);
       setRoom((prev) => {
         if (!prev) return prev;
         return { ...prev, players: data.players };
@@ -211,6 +210,8 @@ export default function MultiGameRoom() {
     });
 
     socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
+      // Arrêter la musique actuelle avant de passer à la suivante
+      setIsPlaying(false);
       setRoom((prev) => {
         if (!prev) return prev;
         return {
