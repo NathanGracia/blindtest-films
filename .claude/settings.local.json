@@ -46,7 +46,8 @@
       "Bash(ls:*)",
       "Skill(frontend-design)",
       "Bash(node check-db.js:*)",
-      "Bash(del \"C:\\\\Users\\\\nathan\\\\Documents\\\\projets\\\\blindtest-films\\\\app\\\\game\\\\page.tsx\")"
+      "Bash(del \"C:\\\\Users\\\\nathan\\\\Documents\\\\projets\\\\blindtest-films\\\\app\\\\game\\\\page.tsx\")",
+      "Bash(sqlite3:*)"
     ]
   }
 }

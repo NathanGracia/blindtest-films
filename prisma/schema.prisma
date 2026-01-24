@@ -28,3 +28,15 @@ model Track {
   categoryId      String
   category        Category @relation(fields: [categoryId], references: [id])
 }
+
+model LadderEntry {
+  id          Int      @id @default(autoincrement())
+  pseudo      String                              // Normalisé en minuscules
+  bestScore   Int                                 // Meilleur score de la semaine
+  weekId      String                              // Format: "2026-W04" (ISO week)
+  lastGameAt  DateTime @default(now())            // Dernière mise à jour
+  gamesPlayed Int      @default(1)                // Nombre de parties jouées
+
+  @@unique([pseudo, weekId])                      // Un pseudo = une entrée par semaine
+  @@index([weekId, bestScore(sort: Desc)])        // Performance pour Top 10
+}

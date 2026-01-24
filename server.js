@@ -17,6 +17,80 @@ const prisma = new PrismaClient();
 // Code de la room publique permanente
 const PUBLIC_ROOM_CODE = 'PUBLIC';
 
+// Calculer l'identifiant de semaine ISO (année-semaine)
+function getWeekId(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// Sauvegarder le score dans le ladder (upsert)
+async function saveLadderScore(pseudo, score) {
+  if (!pseudo || score <= 0) return;
+
+  const normalizedPseudo = pseudo.trim().toLowerCase();
+  const weekId = getWeekId();
+
+  try {
+    const existing = await prisma.ladderEntry.findUnique({
+      where: {
+        pseudo_weekId: {
+          pseudo: normalizedPseudo,
+          weekId,
+        },
+      },
+    });
+
+    if (existing) {
+      // Mettre à jour seulement si nouveau score > ancien
+      if (score > existing.bestScore) {
+        await prisma.ladderEntry.update({
+          where: {
+            pseudo_weekId: {
+              pseudo: normalizedPseudo,
+              weekId,
+            },
+          },
+          data: {
+            bestScore: score,
+            lastGameAt: new Date(),
+            gamesPlayed: { increment: 1 },
+          },
+        });
+        console.log(`[LADDER] ${pseudo}: nouveau best ${score} (semaine ${weekId})`);
+      } else {
+        await prisma.ladderEntry.update({
+          where: {
+            pseudo_weekId: {
+              pseudo: normalizedPseudo,
+              weekId,
+            },
+          },
+          data: {
+            gamesPlayed: { increment: 1 },
+          },
+        });
+      }
+    } else {
+      // Créer nouveau record
+      await prisma.ladderEntry.create({
+        data: {
+          pseudo: normalizedPseudo,
+          bestScore: score,
+          weekId,
+          gamesPlayed: 1,
+        },
+      });
+      console.log(`[LADDER] ${pseudo}: première entrée ${score} pts (${weekId})`);
+    }
+  } catch (error) {
+    console.error('[LADDER] Erreur sauvegarde:', error);
+  }
+}
+
 // Calcul de la distance de Levenshtein (nombre de modifications nécessaires)
 function levenshteinDistance(str1, str2) {
   const m = str1.length;
@@ -332,7 +406,7 @@ function startTimerPublic(room) {
 }
 
 // Passer au track suivant pour la room publique
-function nextTrackPublic(room) {
+async function nextTrackPublic(room) {
   room.currentTrackIndex++;
   room.roundFinders = new Set();
   room.players.forEach(p => p.hasFoundThisRound = false);
@@ -344,9 +418,18 @@ function nextTrackPublic(room) {
       clearInterval(room.timer);
       room.timer = null;
     }
+
+    // NOUVEAU: Sauvegarder les scores dans le ladder
+    const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+    for (const player of sortedPlayers) {
+      if (player.score > 0) {
+        await saveLadderScore(player.pseudo, player.score);
+      }
+    }
+
     if (ioInstance) {
       ioInstance.to(PUBLIC_ROOM_CODE).emit('game:end', {
-        players: room.players.sort((a, b) => b.score - a.score),
+        players: sortedPlayers,
       });
     }
     console.log(`Room publique: partie terminée, ${room.players.length} joueurs`);

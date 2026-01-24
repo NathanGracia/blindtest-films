@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import CategorySelector from '@/components/CategorySelector';
+import LadderSidebar from '@/components/LadderSidebar';
 import { getSocket } from '@/lib/socket';
 
 export default function Home() {
@@ -133,8 +134,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen aero-bg flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center max-w-lg w-full">
+      <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center p-4 gap-8">
+        {/* Espace vide gauche */}
+        <div className="hidden lg:block"></div>
+
+        {/* Contenu principal centré */}
+        <div className="text-center max-w-lg w-full col-start-2 lg:col-start-auto">
           {/* Logo / Title */}
           <div className="mb-8">
             <div className="w-28 h-28 mx-auto mb-5 flex items-center justify-center">
@@ -210,9 +215,10 @@ export default function Home() {
                   Connexion...
                 </span>
               ) : (
-                '🌍 Rejoindre partie publique'
+                '🌍 Rejoindre partie publique (🏆classée)'
               )}
             </button>
+        
           </div>
 
           {/* Rejoindre avec code - Input + Bouton sur même ligne */}
@@ -263,6 +269,11 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Sidebar Ladder - centré dans l'espace de droite */}
+        <div className="hidden lg:flex justify-center">
+          <LadderSidebar />
         </div>
       </div>
 
