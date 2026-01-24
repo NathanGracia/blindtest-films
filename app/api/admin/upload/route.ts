@@ -7,6 +7,9 @@ const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
+// Configuration de la route pour autoriser les gros fichiers
+export const maxDuration = 300; // 5 minutes max pour le traitement audio
+
 function generateFileName(originalName: string): string {
   const ext = path.extname(originalName);
   const baseName = path.basename(originalName, ext)

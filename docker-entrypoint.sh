@@ -8,14 +8,14 @@ DB_FILE="/app/prisma/dev.db"
 # 1. Verifier si la base de donnees existe
 if [ ! -f "$DB_FILE" ]; then
     echo "[1/3] Base de donnees non trouvee, creation..."
-    npx prisma db push --skip-generate
+    npx prisma migrate deploy
 
     echo "[2/3] Initialisation des categories..."
     npm run db:seed
 else
     echo "[1/3] Base de donnees existante detectee, conservation des donnees."
-    echo "[2/3] Verification du schema..."
-    npx prisma db push --skip-generate
+    echo "[2/3] Application des migrations..."
+    npx prisma migrate deploy
 fi
 
 # 3. Demarrer le serveur

@@ -153,12 +153,10 @@ export default function MultiGameRoom() {
       });
       setIsPlaying(true);
       setShowResult(false);
-      setMessages([]);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
       setResultImage(null);
       setIsFinished(false);
-      setInput('');
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -222,13 +220,11 @@ export default function MultiGameRoom() {
         };
       });
       setShowResult(false);
-      setMessages([]);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
       setResultImage(null);
       setResultTrackId(null);
       setIsPlaying(true);
-      setInput('');
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -288,10 +284,10 @@ export default function MultiGameRoom() {
   }, [messages]);
 
   useEffect(() => {
-    if (isPlaying && !showResult) {
+    if (isPlaying) {
       inputRef.current?.focus();
     }
-  }, [isPlaying, showResult]);
+  }, [isPlaying]);
 
   const handleLeave = () => {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
@@ -302,7 +298,7 @@ export default function MultiGameRoom() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !isPlaying || showResult) return;
+    if (!input.trim() || !isPlaying) return;
 
     socketRef.current.emit('game:answer', input.trim());
     setInput('');
@@ -662,7 +658,7 @@ export default function MultiGameRoom() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    disabled={!isPlaying || showResult}
+                    disabled={!isPlaying}
                     placeholder={
                       isPlaying
                         ? 'Devine la musique...'
@@ -673,7 +669,7 @@ export default function MultiGameRoom() {
                   />
                   <button
                     type="submit"
-                    disabled={!isPlaying || showResult || !input.trim()}
+                    disabled={!isPlaying || !input.trim()}
                     className="btn-aero px-6 py-3 text-white rounded-none border-0 border-l border-white/20 disabled:opacity-50"
                   >
                     Envoyer

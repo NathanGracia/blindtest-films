@@ -50,9 +50,6 @@ export default function LadderSidebar() {
         </h3>
       </div>
 
-      <div className="text-white/50 text-xs mb-3 text-center">
-        Semaine {weekId}
-      </div>
 
       {entries.length === 0 ? (
         <div className="text-white/40 text-sm text-center py-8">
