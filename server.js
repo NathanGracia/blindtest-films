@@ -87,7 +87,7 @@ async function createPublicRoom() {
       deletionTimer: null,
       isPublic: true,
       startCountdown: null,
-      startCountdownValue: 15,
+      startCountdownValue: 10,
     };
     rooms.set(PUBLIC_ROOM_CODE, publicRoom);
     console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${limitedTracks.length} tracks répartis équitablement`);
@@ -157,6 +157,14 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
     return [];
   }
 
+  // Shuffler chaque catégorie AVANT la sélection pour avoir de la variété
+  const shuffledTracksPerCategory = {};
+  for (const cat of categories) {
+    if (tracksPerCategory[cat]) {
+      shuffledTracksPerCategory[cat] = shuffleArray(tracksPerCategory[cat]);
+    }
+  }
+
   const numCategories = categories.length;
   const basePerCategory = Math.floor(totalRounds / numCategories);
   const remainder = totalRounds % numCategories;
@@ -166,11 +174,11 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
 
   // Phase 1: Assigner le quota de base à chaque catégorie
   for (const cat of categories) {
-    const available = tracksPerCategory[cat]?.length || 0;
+    const available = shuffledTracksPerCategory[cat]?.length || 0;
     const toTake = Math.min(basePerCategory, available);
 
     if (toTake > 0) {
-      result.push(...tracksPerCategory[cat].slice(0, toTake));
+      result.push(...shuffledTracksPerCategory[cat].slice(0, toTake));
       remainingRounds -= toTake;
     }
   }
@@ -178,11 +186,11 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
   // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité
   for (let i = 0; i < categories.length && remainingRounds > 0; i++) {
     const cat = categories[i];
-    const available = tracksPerCategory[cat]?.length || 0;
+    const available = shuffledTracksPerCategory[cat]?.length || 0;
     const alreadyTaken = result.filter(t => t.categoryId === cat).length;
 
     if (alreadyTaken < available && i < remainder) {
-      result.push(tracksPerCategory[cat][alreadyTaken]);
+      result.push(shuffledTracksPerCategory[cat][alreadyTaken]);
       remainingRounds--;
     }
   }
@@ -205,7 +213,7 @@ let ioInstance = null;
 function startPublicRoomCountdown(room) {
   if (room.startCountdown) return; // Déjà en cours
 
-  room.startCountdownValue = 30;
+  room.startCountdownValue = 10;
   console.log(`Countdown room publique démarré`);
 
   room.startCountdown = setInterval(async () => {
@@ -228,7 +236,7 @@ function stopPublicRoomCountdown(room) {
   if (room.startCountdown) {
     clearInterval(room.startCountdown);
     room.startCountdown = null;
-    room.startCountdownValue = 30;
+    room.startCountdownValue = 10;
     console.log(`Countdown room publique arrêté`);
   }
 }
@@ -343,8 +351,8 @@ function nextTrackPublic(room) {
     }
     console.log(`Room publique: partie terminée, ${room.players.length} joueurs`);
 
-    // Lancer le countdown pour une nouvelle partie après 15 secondes
-    room.startCountdownValue = 15;
+    // Lancer le countdown pour une nouvelle partie après 10 secondes
+    room.startCountdownValue = 10;
     room.startCountdown = setInterval(async () => {
       room.startCountdownValue--;
 

@@ -22,6 +22,14 @@ export function distributeTracksEquitably(
     return [];
   }
 
+  // Shuffler chaque catégorie AVANT la sélection pour avoir de la variété
+  const shuffledTracksPerCategory: Record<string, Track[]> = {};
+  for (const cat of categories) {
+    if (tracksPerCategory[cat]) {
+      shuffledTracksPerCategory[cat] = shuffleArray(tracksPerCategory[cat]);
+    }
+  }
+
   const numCategories = categories.length;
   const basePerCategory = Math.floor(totalRounds / numCategories);
   const remainder = totalRounds % numCategories;
@@ -31,11 +39,11 @@ export function distributeTracksEquitably(
 
   // Phase 1: Assigner le quota de base à chaque catégorie
   for (const cat of categories) {
-    const available = tracksPerCategory[cat]?.length || 0;
+    const available = shuffledTracksPerCategory[cat]?.length || 0;
     const toTake = Math.min(basePerCategory, available);
 
     if (toTake > 0) {
-      result.push(...tracksPerCategory[cat].slice(0, toTake));
+      result.push(...shuffledTracksPerCategory[cat].slice(0, toTake));
       remainingRounds -= toTake;
     }
   }
@@ -43,11 +51,11 @@ export function distributeTracksEquitably(
   // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité
   for (let i = 0; i < categories.length && remainingRounds > 0; i++) {
     const cat = categories[i];
-    const available = tracksPerCategory[cat]?.length || 0;
+    const available = shuffledTracksPerCategory[cat]?.length || 0;
     const alreadyTaken = result.filter(t => t.categoryId === cat).length;
 
     if (alreadyTaken < available && i < remainder) {
-      result.push(tracksPerCategory[cat][alreadyTaken]);
+      result.push(shuffledTracksPerCategory[cat][alreadyTaken]);
       remainingRounds--;
     }
   }
