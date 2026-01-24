@@ -612,34 +612,45 @@ export default function MultiGameRoom() {
                           msg.isFromFinder ? 'opacity-90' : ''
                         }`}
                       >
-                        <span
-                          className={`font-semibold ${
-                            msg.isFromFinder
-                              ? 'text-[#4a90d9]'
-                              : msg.playerId === myId
-                                ? 'text-[#7ec8e3]'
-                                : 'text-[#4a90d9]'
-                          }`}
-                        >
-                          {msg.pseudo}:
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={`font-semibold ${
+                              msg.isFromFinder
+                                ? 'text-[#4a90d9]'
+                                : msg.playerId === myId
+                                  ? 'text-[#7ec8e3]'
+                                  : 'text-[#4a90d9]'
+                            }`}
+                          >
+                            {msg.pseudo}
+                          </span>
+                          {msg.isFromFinder && (
+                            <span className="text-[#4a90d9] text-sm" title="Message d'un gagnant">
+                              👑
+                            </span>
+                          )}
+                          <span
+                            className={`font-semibold ${
+                              msg.isFromFinder
+                                ? 'text-[#4a90d9]'
+                                : msg.playerId === myId
+                                  ? 'text-[#7ec8e3]'
+                                  : 'text-[#4a90d9]'
+                            }`}
+                          >
+                            :
+                          </span>
+                        </div>
                         <span
                           className={
                             msg.isCorrect
                               ? 'text-[#7fba00] font-bold'
-                              : msg.isFromFinder
-                                ? 'text-[#4a90d9]/90 italic'
-                                : 'text-white/70'
+                              : 'text-white/70'
                           }
                         >
                           {msg.message}
                         </span>
                         {msg.isCorrect && <span className="text-[#7fba00]">✓</span>}
-                        {msg.isFromFinder && (
-                          <span className="text-[#4a90d9] text-xs" title="Message d'un gagnant">
-                            👑
-                          </span>
-                        )}
                       </div>
                     ))
                   )}

@@ -681,13 +681,8 @@ app.prepare().then(async () => {
         isFromFinder: alreadyFound,
       };
 
-      // ROUTING SÉLECTIF DES MESSAGES
-      if (alreadyFound) {
-        // Joueur qui a déjà trouvé : envoyer uniquement aux autres qui ont trouvé
-        room.roundFinders.forEach(finderId => {
-          io.to(finderId).emit('chat:message', chatMessage);
-        });
-      } else if (isCorrect) {
+      // ROUTING DES MESSAGES
+      if (isCorrect) {
         // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
         const foundMessage = {
           pseudo: currentPseudo,
@@ -699,8 +694,7 @@ app.prepare().then(async () => {
         // Envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', foundMessage);
       } else {
-        // Mauvaise réponse : envoyer à tout le monde (gagnants et non-gagnants)
-        // Les gagnants peuvent ainsi voir les tentatives des autres pour les aider
+        // Tous les autres messages (mauvaises réponses, messages après avoir trouvé) : envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', chatMessage);
       }
 
