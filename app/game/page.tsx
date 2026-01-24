@@ -39,21 +39,38 @@ export default function GamePage() {
   useEffect(() => {
     const loadTracks = async () => {
       try {
-        // Récupérer les catégories sélectionnées
+        // Récupérer les catégories et le nombre de rounds sélectionnés
         const savedCategories = sessionStorage.getItem('blindtest_categories');
+        const savedRounds = sessionStorage.getItem('blindtest_rounds');
+
         let url = '/api/tracks';
+        const params = new URLSearchParams();
 
         if (savedCategories) {
           const categories = JSON.parse(savedCategories);
           if (categories.length > 0) {
-            url += `?categories=${categories.join(',')}`;
+            params.append('categories', categories.join(','));
           }
+        }
+
+        if (savedRounds) {
+          params.append('limit', savedRounds);
+        }
+
+        if (params.toString()) {
+          url += `?${params.toString()}`;
         }
 
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           const shuffled = shuffleArray(data as Track[]);
+
+          // Warning si moins de tracks que demandé
+          if (savedRounds && shuffled.length < parseInt(savedRounds)) {
+            console.warn(`Seulement ${shuffled.length} musiques disponibles (${savedRounds} demandées)`);
+          }
+
           setTracks(shuffled);
 
           if (shuffled.length > 0) {

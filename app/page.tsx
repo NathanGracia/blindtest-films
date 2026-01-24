@@ -7,6 +7,7 @@ import CategorySelector from '@/components/CategorySelector';
 
 export default function Home() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedRounds, setSelectedRounds] = useState(25);
 
   // Charger la sélection sauvegardée
   useEffect(() => {
@@ -18,11 +19,24 @@ export default function Home() {
         // Ignorer les erreurs de parsing
       }
     }
+
+    const savedRounds = sessionStorage.getItem('blindtest_rounds');
+    if (savedRounds) {
+      const rounds = parseInt(savedRounds, 10);
+      if (!isNaN(rounds)) {
+        setSelectedRounds(rounds);
+      }
+    }
   }, []);
 
   const handleSelectionChange = useCallback((selected: string[]) => {
     setSelectedCategories(selected);
     sessionStorage.setItem('blindtest_categories', JSON.stringify(selected));
+  }, []);
+
+  const handleRoundsChange = useCallback((rounds: number) => {
+    setSelectedRounds(rounds);
+    sessionStorage.setItem('blindtest_rounds', rounds.toString());
   }, []);
 
   return (
@@ -47,6 +61,8 @@ export default function Home() {
             <CategorySelector
               onSelectionChange={handleSelectionChange}
               initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
+              onRoundsChange={handleRoundsChange}
+              initialRounds={selectedRounds}
             />
             <Link
               href="/game"

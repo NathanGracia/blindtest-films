@@ -13,6 +13,7 @@ export default function MultiLobby() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedRounds, setSelectedRounds] = useState(25);
 
   // Charger la sélection sauvegardée
   useEffect(() => {
@@ -24,11 +25,23 @@ export default function MultiLobby() {
         // Ignorer les erreurs de parsing
       }
     }
+
+    const savedRounds = sessionStorage.getItem('blindtest_rounds');
+    if (savedRounds) {
+      const rounds = parseInt(savedRounds, 10);
+      if (!isNaN(rounds)) {
+        setSelectedRounds(rounds);
+      }
+    }
   }, []);
 
   const handleSelectionChange = useCallback((selected: string[]) => {
     setSelectedCategories(selected);
     sessionStorage.setItem('blindtest_categories', JSON.stringify(selected));
+  }, []);
+
+  const handleRoundsChange = useCallback((rounds: number) => {
+    setSelectedRounds(rounds);
   }, []);
 
   const handleCreate = () => {
@@ -52,7 +65,7 @@ export default function MultiLobby() {
       setIsLoading(false);
     });
 
-    socket.emit('room:create', pseudo.trim(), selectedCategories, (code: string | null, errorMsg?: string) => {
+    socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, (code: string | null, errorMsg?: string) => {
       if (code) {
         sessionStorage.setItem('blindtest_pseudo', pseudo.trim());
         try { sessionStorage.setItem('blindtest_created_room', code); } catch {}
@@ -113,7 +126,7 @@ export default function MultiLobby() {
 
   return (
     <div className="min-h-screen aero-bg flex items-center justify-center p-4">
-      <div className="glass rounded-2xl p-8 max-w-md w-full">
+      <div className="glass rounded-2xl p-8 max-w-lg w-full">
         <Link href="/" className="text-white/60 hover:text-white mb-6 inline-flex items-center gap-2 transition-colors">
           ← Retour
         </Link>
@@ -178,11 +191,13 @@ export default function MultiLobby() {
           </div>
         </div>
 
-        {/* Catégories pour la création */}
+        {/* Catégories et nombre de rounds */}
         <div className="mb-6">
           <CategorySelector
             onSelectionChange={handleSelectionChange}
             initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
+            onRoundsChange={handleRoundsChange}
+            initialRounds={selectedRounds}
           />
         </div>
 

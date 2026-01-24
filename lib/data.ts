@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { Track, Category } from '@/types';
+import { distributeTracksEquitably } from './track-distribution';
 
 // Convertir un track Prisma vers le type Track
 function toTrack(dbTrack: {
@@ -195,4 +196,28 @@ export async function resetReportCount(id: number): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Obtenir les tracks avec distribution équitable entre catégories
+export async function getTracksWithDistribution(
+  categoryIds: string[],
+  limit: number
+): Promise<Track[]> {
+  if (categoryIds.length === 0) {
+    return [];
+  }
+
+  // 1. Charger les tracks par catégorie (séparément)
+  const tracksPerCategory: Record<string, Track[]> = {};
+
+  for (const catId of categoryIds) {
+    const tracks = await prisma.track.findMany({
+      where: { categoryId: catId },
+      orderBy: { id: 'asc' },
+    });
+    tracksPerCategory[catId] = tracks.map(toTrack);
+  }
+
+  // 2. Appliquer la distribution équitable
+  return distributeTracksEquitably(categoryIds, limit, tracksPerCategory);
 }

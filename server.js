@@ -139,6 +139,45 @@ function shuffleArray(array) {
   return shuffled;
 }
 
+// Distribuer équitablement les tracks entre catégories
+function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
+  if (categories.length === 0) {
+    return [];
+  }
+
+  const numCategories = categories.length;
+  const basePerCategory = Math.floor(totalRounds / numCategories);
+  const remainder = totalRounds % numCategories;
+
+  const result = [];
+  let remainingRounds = totalRounds;
+
+  // Phase 1: Assigner le quota de base à chaque catégorie
+  for (const cat of categories) {
+    const available = tracksPerCategory[cat]?.length || 0;
+    const toTake = Math.min(basePerCategory, available);
+
+    if (toTake > 0) {
+      result.push(...tracksPerCategory[cat].slice(0, toTake));
+      remainingRounds -= toTake;
+    }
+  }
+
+  // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité
+  for (let i = 0; i < categories.length && remainingRounds > 0; i++) {
+    const cat = categories[i];
+    const available = tracksPerCategory[cat]?.length || 0;
+    const alreadyTaken = result.filter(t => t.categoryId === cat).length;
+
+    if (alreadyTaken < available && i < remainder) {
+      result.push(tracksPerCategory[cat][alreadyTaken]);
+      remainingRounds--;
+    }
+  }
+
+  return shuffleArray(result);
+}
+
 // Filtrer les tracks par catégories
 function filterTracksByCategories(tracks, categoryIds) {
   if (!categoryIds || categoryIds.length === 0) {
@@ -346,11 +385,16 @@ app.prepare().then(async () => {
     let currentPseudo = null;
 
     // Créer une room
-    socket.on('room:create', async (pseudo, categories, callback) => {
-      // Support de l'ancienne API (sans catégories)
+    socket.on('room:create', async (pseudo, categories, maxRounds, callback) => {
+      // Backward compatibility
+      if (typeof maxRounds === 'function') {
+        callback = maxRounds;
+        maxRounds = null;
+      }
       if (typeof categories === 'function') {
         callback = categories;
         categories = null;
+        maxRounds = null;
       }
 
       try {
@@ -368,13 +412,39 @@ app.prepare().then(async () => {
           return;
         }
 
+        // Distribution équitable si maxRounds fourni
+        let finalTracks = filteredTracks;
+        if (maxRounds && maxRounds < filteredTracks.length) {
+          // Grouper par catégorie
+          const tracksPerCategory = {};
+          for (const track of filteredTracks) {
+            if (!tracksPerCategory[track.categoryId]) {
+              tracksPerCategory[track.categoryId] = [];
+            }
+            tracksPerCategory[track.categoryId].push(track);
+          }
+
+          // Distribuer équitablement
+          const activeCategories = categories && categories.length > 0
+            ? categories
+            : Object.keys(tracksPerCategory);
+
+          finalTracks = distributeTracksEquitably(
+            activeCategories,
+            maxRounds,
+            tracksPerCategory
+          );
+        } else {
+          finalTracks = shuffleArray(filteredTracks);
+        }
+
         const room = {
           code,
           players: [{ id: socket.id, pseudo, score: 0, hasFoundThisRound: false }],
           currentTrackIndex: 0,
           isPlaying: false,
           hostId: socket.id,
-          tracks: shuffleArray(filteredTracks),
+          tracks: finalTracks,
           categories: categories || [],
           timer: null,
           timeRemaining: 30,
@@ -387,7 +457,7 @@ app.prepare().then(async () => {
         currentRoom = code;
         currentPseudo = pseudo;
 
-        console.log(`Room ${code} créée par ${pseudo} avec ${filteredTracks.length} tracks`);
+        console.log(`Room ${code} créée par ${pseudo} avec ${finalTracks.length} tracks`);
         callback(code);
       } catch (error) {
         console.error('Erreur création room:', error);

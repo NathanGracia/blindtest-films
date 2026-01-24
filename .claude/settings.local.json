@@ -44,7 +44,8 @@
       "Bash(do clear)",
       "Bash(done)",
       "Bash(ls:*)",
-      "Skill(frontend-design)"
+      "Skill(frontend-design)",
+      "Bash(node check-db.js:*)"
     ]
   }
 }
