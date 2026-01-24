@@ -188,14 +188,32 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/admin/tracks" className="text-white/60 hover:text-white transition-colors">
-          ← Retour aux musiques
-        </Link>
-        <h2 className="text-2xl font-bold text-white mt-2">Modifier la musique</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <Link href="/admin/tracks" className="text-white/60 hover:text-white transition-colors">
+            ← Retour aux musiques
+          </Link>
+          <h2 className="text-2xl font-bold text-white mt-2">Modifier la musique</h2>
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            form="track-edit-form"
+            disabled={isLoading}
+            className="btn-aero-green px-6 py-3 text-white font-semibold rounded-xl disabled:opacity-50"
+          >
+            {isLoading ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+          <Link
+            href="/admin/tracks"
+            className="btn-aero px-6 py-3 text-white rounded-xl"
+          >
+            Annuler
+          </Link>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+      <form id="track-edit-form" onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
         {error && (
           <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-red-400">
             {error}
