@@ -23,16 +23,6 @@ export interface Track {
 // Alias pour compatibilité (à supprimer progressivement)
 export type Film = Track;
 
-export interface GameState {
-  currentIndex: number;
-  score: number;
-  timeRemaining: number;
-  isPlaying: boolean;
-  isFinished: boolean;
-  showResult: boolean;
-  wasCorrect: boolean;
-}
-
 export interface Attempt {
   text: string;
   isCorrect: boolean;

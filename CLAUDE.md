@@ -2,7 +2,7 @@
 
 ## Apercu rapide
 
-Application de blindtest musical pour films/series/jeux/anime. Style Skribbl.io avec modes solo et multijoueur temps reel.
+Application de blindtest musical pour films/series/jeux/anime. Style Skribbl.io avec système de rooms multijoueur temps réel (parties privées ou publique).
 
 **Stack** : Next.js 16 + React 19 + Socket.IO + Prisma SQLite + Tailwind CSS + Python (import)
 
@@ -37,10 +37,8 @@ docker-compose up -d     # Lancer app + Caddy HTTPS
 ```
 blindtest-films/
 ├── app/                          # Next.js App Router
-│   ├── page.tsx                 # Accueil (selection categories)
-│   ├── game/page.tsx            # Mode Solo
+│   ├── page.tsx                 # Accueil (pseudo + créer/rejoindre parties)
 │   ├── multi/
-│   │   ├── page.tsx             # Lobby multijoueur
 │   │   └── [roomCode]/page.tsx  # Salle de jeu (WebSocket)
 │   ├── admin/                   # Interface admin protegee
 │   │   ├── tracks/              # CRUD tracks
@@ -185,18 +183,32 @@ IMPORT_API_TOKEN=xxx         # Token scripts Python (defaut: ADMIN_PASSWORD)
 
 ## Flux de jeu
 
-### Solo
+Tous les modes de jeu utilisent le système multijoueur (rooms). Un joueur seul = une room avec 1 joueur.
+Tout se passe depuis la page d'accueil, plus besoin de page intermédiaire /multi.
+
+### Créer une partie privée
 ```
-Accueil → Selection categories (sessionStorage) → /game
-→ Fetch tracks → Shuffle → AudioPlayer + Timer
-→ Saisie reponse → Verification locale → Score
-→ Revele image → Track suivant → Fin partie
+Accueil → Pseudo + Catégories + Rounds
+→ Bouton "Créer partie privée" → room:create (Socket.IO)
+→ Redirection /multi/[roomCode] (ex: ABC123)
+→ game:start → AudioPlayer + Timer + Chat
+→ Saisie réponse → Broadcast → Score
+→ game:round-end → game:end → Classement final
 ```
 
-### Multijoueur
+### Rejoindre partie publique
 ```
-/multi → Pseudo + categories → room:create ou room:join
-→ /multi/[roomCode] → Socket listeners
-→ game:start → game:tick → Reponses broadcast
-→ game:round-end → game:end → Classement final
+Accueil → Pseudo
+→ Bouton "Rejoindre partie publique" → room:join PUBLIC (Socket.IO)
+→ Redirection /multi/PUBLIC
+→ Attente autres joueurs ou démarrage automatique
+→ game:start → game:tick → Classement en temps réel
+```
+
+### Rejoindre partie privée (via code)
+```
+Accueil → Pseudo + "Rejoindre avec un code"
+→ Input code room (ex: ABC123) → room:join [CODE] (Socket.IO)
+→ Redirection /multi/[CODE]
+→ Jeu avec catégories définies par l'hôte
 ```

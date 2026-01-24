@@ -59,8 +59,8 @@ export default function MultiGameRoom() {
     })();
 
     if (!storedPseudo) {
-      // No pseudo stored — go back to lobby
-      router.push('/multi');
+      // No pseudo stored — go back to home
+      router.push('/');
     } else {
       // If this client just created the room, skip the explicit join (server already added the creator)
       const justCreatedRoom = (() => {
@@ -73,7 +73,7 @@ export default function MultiGameRoom() {
         // Request the room state directly
         socket.emit('room:state', (state: RoomState | null) => {
           if (!state) {
-            router.push('/multi');
+            router.push('/');
             return;
           }
           setRoom(state);
@@ -91,7 +91,7 @@ export default function MultiGameRoom() {
         socket.emit('room:join', roomCode, storedPseudo, (success: boolean, errorMsg?: string, finalPseudo?: string) => {
           if (!success) {
             console.warn('[multi-room] join failed', errorMsg);
-            router.push('/multi');
+            router.push('/');
             return;
           }
 
@@ -101,7 +101,7 @@ export default function MultiGameRoom() {
           // Now request the room state
           socket.emit('room:state', (state: RoomState | null) => {
             if (!state) {
-              router.push('/multi');
+              router.push('/');
               return;
             }
             setRoom(state);
@@ -297,7 +297,7 @@ export default function MultiGameRoom() {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
     socketRef.current.emit('room:leave');
     try { sessionStorage.removeItem('blindtest_pseudo'); } catch {}
-    router.push('/multi');
+    router.push('/');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
