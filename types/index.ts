@@ -45,7 +45,7 @@ export interface RoomState {
   hostId: string | null;
   timeRemaining: number;
   currentTrack: {
-    audioFile: string;
+    trackId: number;
     imageFile: string | null;
     timeLimit: number;
     startTime: number;

@@ -3,22 +3,25 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 
 interface AudioPlayerProps {
-  src: string;
+  trackId: number;
   isPlaying: boolean;
   startTime?: number;
   volume?: number;
   onError?: () => void;
 }
 
-export default function AudioPlayer({ src, isPlaying, startTime = 0, volume = 0.7, onError }: AudioPlayerProps) {
+export default function AudioPlayer({ trackId, isPlaying, startTime = 0, volume = 0.7, onError }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showLoader, setShowLoader] = useState(false);
-  const prevSrcRef = useRef<string>('');
+  const prevTrackIdRef = useRef<number>(0);
   const hasSetStartTime = useRef(false);
   const loaderTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Construire l'URL de l'audio depuis l'API
+  const audioSrc = `/api/audio/${trackId}`;
 
   // Appliquer le volume
   useEffect(() => {
@@ -27,10 +30,10 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, volume = 0.
     }
   }, [volume]);
 
-  // Reset state when src changes
+  // Reset state when trackId changes
   useEffect(() => {
-    if (src !== prevSrcRef.current) {
-      prevSrcRef.current = src;
+    if (trackId !== prevTrackIdRef.current) {
+      prevTrackIdRef.current = trackId;
       setHasError(false);
       setIsReady(false);
       setIsLoading(true);
@@ -53,7 +56,7 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, volume = 0.
         audioRef.current.load();
       }
     }
-  }, [src, startTime]);
+  }, [trackId, startTime]);
 
   // Cleanup loader timeout on unmount
   useEffect(() => {
@@ -185,7 +188,7 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, volume = 0.
 
       <audio
         ref={audioRef}
-        src={src}
+        src={audioSrc}
         preload="auto"
         onCanPlay={handleCanPlay}
         onError={handleError}

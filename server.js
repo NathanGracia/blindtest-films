@@ -371,7 +371,7 @@ async function startPublicGame(room) {
 
     ioInstance.to(PUBLIC_ROOM_CODE).emit('game:start', {
       trackIndex: room.currentTrackIndex,
-      audioFile: currentTrack.audioFile,
+      trackId: currentTrack.id,
       imageFile: currentTrack.imageFile,
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,
@@ -492,7 +492,7 @@ async function nextTrackPublic(room) {
   if (ioInstance) {
     ioInstance.to(PUBLIC_ROOM_CODE).emit('game:next', {
       trackIndex: room.currentTrackIndex,
-      audioFile: currentTrack.audioFile,
+      trackId: currentTrack.id,
       imageFile: currentTrack.imageFile,
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,
@@ -698,7 +698,7 @@ app.prepare().then(async () => {
         hostId: room.hostId,
         timeRemaining: room.timeRemaining,
         currentTrack: room.isPlaying && currentTrack ? {
-          audioFile: currentTrack.audioFile,
+          trackId: currentTrack.id,
           imageFile: currentTrack.imageFile,
           timeLimit: currentTrack.timeLimit,
           startTime: currentTrack.startTime || 0,
@@ -767,7 +767,7 @@ app.prepare().then(async () => {
 
         io.to(currentRoom).emit('game:start', {
           trackIndex: room.currentTrackIndex,
-          audioFile: currentTrack.audioFile,
+          trackId: currentTrack.id,
           imageFile: currentTrack.imageFile,
           timeLimit: currentTrack.timeLimit,
           startTime: currentTrack.startTime || 0,
@@ -1062,7 +1062,7 @@ app.prepare().then(async () => {
 
     io.to(roomCode).emit('game:next', {
       trackIndex: room.currentTrackIndex,
-      audioFile: currentTrack.audioFile,
+      trackId: currentTrack.id,
       imageFile: currentTrack.imageFile,
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,

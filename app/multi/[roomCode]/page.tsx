@@ -141,14 +141,14 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:start', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
+    socket.on('game:start', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           isPlaying: true,
           currentTrackIndex: data.trackIndex,
-          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
+          currentTrack: { trackId: data.trackId, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
           totalTracks: data.totalTracks,
           players: prev.players.map((p) => ({ ...p, score: 0 })),
         };
@@ -209,7 +209,7 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:next', (data: { trackIndex: number; audioFile: string; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
+    socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
       // Arrêter la musique actuelle avant de passer à la suivante
       setIsPlaying(false);
       setRoom((prev) => {
@@ -217,7 +217,7 @@ export default function MultiGameRoom() {
         return {
           ...prev,
           currentTrackIndex: data.trackIndex,
-          currentTrack: { audioFile: data.audioFile, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
+          currentTrack: { trackId: data.trackId, imageFile: data.imageFile || null, timeLimit: data.timeLimit, startTime: data.startTime || 0 },
           totalTracks: data.totalTracks,
         };
       });
@@ -514,7 +514,7 @@ export default function MultiGameRoom() {
             {/* Audio */}
             <div className="flex justify-center py-4">
               <AudioPlayer
-                src={room.currentTrack?.audioFile || ''}
+                trackId={room.currentTrack?.trackId || 0}
                 isPlaying={isPlaying}
                 startTime={room.currentTrack?.startTime || 0}
                 volume={volume}
