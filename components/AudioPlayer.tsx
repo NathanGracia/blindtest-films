@@ -6,10 +6,11 @@ interface AudioPlayerProps {
   src: string;
   isPlaying: boolean;
   startTime?: number;
+  volume?: number;
   onError?: () => void;
 }
 
-export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: AudioPlayerProps) {
+export default function AudioPlayer({ src, isPlaying, startTime = 0, volume = 0.7, onError }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -18,6 +19,13 @@ export default function AudioPlayer({ src, isPlaying, startTime = 0, onError }: 
   const prevSrcRef = useRef<string>('');
   const hasSetStartTime = useRef(false);
   const loaderTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Appliquer le volume
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   // Reset state when src changes
   useEffect(() => {

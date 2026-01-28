@@ -8,6 +8,7 @@ import AudioPlayer from '@/components/AudioPlayer';
 import PlayerList from '@/components/PlayerList';
 import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
+import VolumeSlider from '@/components/VolumeSlider';
 import { Player, ChatMessage, RoomState } from '@/types';
 
 export default function MultiGameRoom() {
@@ -30,6 +31,7 @@ export default function MultiGameRoom() {
   const [isFinished, setIsFinished] = useState(false);
   const [finalScores, setFinalScores] = useState<Player[]>([]);
   const [publicCountdown, setPublicCountdown] = useState<number | null>(null);
+  const [volume, setVolume] = useState(0.7);
 
   // États pour le système de score Skribbl.io
   const [hasFoundThisRound, setHasFoundThisRound] = useState(false);
@@ -476,6 +478,9 @@ export default function MultiGameRoom() {
   // Jeu en cours
   return (
     <div className="min-h-screen aero-bg p-4">
+      {/* Slider de volume */}
+      <VolumeSlider onVolumeChange={setVolume} />
+
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -512,6 +517,7 @@ export default function MultiGameRoom() {
                 src={room.currentTrack?.audioFile || ''}
                 isPlaying={isPlaying}
                 startTime={room.currentTrack?.startTime || 0}
+                volume={volume}
               />
             </div>
 
