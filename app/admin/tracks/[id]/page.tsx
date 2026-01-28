@@ -292,7 +292,10 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
                 onChange={(e) => setTimeLimit(parseInt(e.target.value) || 30)}
                 min={10}
                 max={120}
-                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl
+                  [&::-webkit-inner-spin-button]:hidden
+                  [&::-webkit-outer-spin-button]:hidden
+                  [-moz-appearance:textfield]"
               />
             </div>
           </div>
