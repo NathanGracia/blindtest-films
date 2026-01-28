@@ -204,7 +204,7 @@ export default function TracksPage() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="🔍 Rechercher par titre..."
+              placeholder="🔍 Rechercher par titre (VO ou VF)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-4 py-2 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/10 focus:border-[#7ec8e3] focus:outline-none transition-colors"
