@@ -227,6 +227,13 @@ function shuffleArray(array) {
 
 // Distribuer équitablement les tracks entre catégories
 function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
+  console.log('[DEBUG distributeTracksEquitably] INPUT:', {
+    categories,
+    totalRounds,
+    tracksPerCategoryKeys: Object.keys(tracksPerCategory),
+    tracksPerCategoryCount: Object.fromEntries(Object.entries(tracksPerCategory).map(([k,v]) => [k, v.length]))
+  });
+
   if (categories.length === 0) {
     return [];
   }
@@ -243,6 +250,8 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
   const basePerCategory = Math.floor(totalRounds / numCategories);
   const remainder = totalRounds % numCategories;
 
+  console.log('[DEBUG] Phase 0:', { numCategories, basePerCategory, remainder });
+
   const result = [];
   let remainingRounds = totalRounds;
 
@@ -251,25 +260,38 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
     const available = shuffledTracksPerCategory[cat]?.length || 0;
     const toTake = Math.min(basePerCategory, available);
 
+    console.log(`[DEBUG] Phase 1 - ${cat}: available=${available}, basePerCategory=${basePerCategory}, toTake=${toTake}`);
+
     if (toTake > 0) {
       result.push(...shuffledTracksPerCategory[cat].slice(0, toTake));
       remainingRounds -= toTake;
     }
   }
 
+  console.log('[DEBUG] Après Phase 1:', { resultLength: result.length, remainingRounds });
+
   // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité
-  for (let i = 0; i < categories.length && remainingRounds > 0; i++) {
-    const cat = categories[i];
+  let categoryIndex = 0;
+  while (remainingRounds > 0 && categoryIndex < categories.length * 10) { // Protection contre boucle infinie
+    const cat = categories[categoryIndex % categories.length];
     const available = shuffledTracksPerCategory[cat]?.length || 0;
     const alreadyTaken = result.filter(t => t.categoryId === cat).length;
 
-    if (alreadyTaken < available && i < remainder) {
+    console.log(`[DEBUG] Phase 2 iteration ${categoryIndex} - ${cat}: available=${available}, alreadyTaken=${alreadyTaken}, remainingRounds=${remainingRounds}`);
+
+    if (alreadyTaken < available) {
       result.push(shuffledTracksPerCategory[cat][alreadyTaken]);
       remainingRounds--;
+      console.log(`[DEBUG] Phase 2 - Ajouté 1 track de ${cat}, remainingRounds=${remainingRounds}, resultLength=${result.length}`);
     }
+    categoryIndex++;
   }
 
-  return shuffleArray(result);
+  console.log('[DEBUG] Après Phase 2:', { resultLength: result.length, remainingRounds });
+
+  const shuffled = shuffleArray(result);
+  console.log('[DEBUG distributeTracksEquitably] OUTPUT:', { finalLength: shuffled.length });
+  return shuffled;
 }
 
 // Filtrer les tracks par catégories
@@ -500,6 +522,8 @@ app.prepare().then(async () => {
 
     // Créer une room
     socket.on('room:create', async (pseudo, categories, maxRounds, callback) => {
+      console.log('[DEBUG room:create] RECEIVED:', { pseudo, categories, maxRounds, maxRoundsType: typeof maxRounds });
+
       // Backward compatibility
       if (typeof maxRounds === 'function') {
         callback = maxRounds;
@@ -510,6 +534,8 @@ app.prepare().then(async () => {
         categories = null;
         maxRounds = null;
       }
+
+      console.log('[DEBUG room:create] AFTER COMPAT CHECK:', { pseudo, categories, maxRounds });
 
       // Vérifier que callback est une fonction
       if (typeof callback !== 'function') {
@@ -525,7 +551,9 @@ app.prepare().then(async () => {
 
         // Charger et filtrer les tracks
         const allTracks = await loadTracks();
+        console.log('[DEBUG room:create] allTracks loaded:', allTracks.length);
         const filteredTracks = filterTracksByCategories(allTracks, categories);
+        console.log('[DEBUG room:create] filteredTracks:', filteredTracks.length);
 
         if (filteredTracks.length === 0) {
           callback(null, 'Aucune musique disponible pour les catégories sélectionnées');
@@ -534,7 +562,8 @@ app.prepare().then(async () => {
 
         // Distribution équitable si maxRounds fourni
         let finalTracks = filteredTracks;
-        if (maxRounds && maxRounds < filteredTracks.length) {
+        if (maxRounds && maxRounds > 0) {
+          console.log('[DEBUG room:create] Entering distribution with maxRounds:', maxRounds);
           // Grouper par catégorie
           const tracksPerCategory = {};
           for (const track of filteredTracks) {
@@ -549,12 +578,15 @@ app.prepare().then(async () => {
             ? categories
             : Object.keys(tracksPerCategory);
 
+          console.log('[DEBUG room:create] Calling distributeTracksEquitably with:', { activeCategories, maxRounds });
           finalTracks = distributeTracksEquitably(
             activeCategories,
             maxRounds,
             tracksPerCategory
           );
+          console.log('[DEBUG room:create] Got finalTracks:', finalTracks.length);
         } else {
+          console.log('[DEBUG room:create] No maxRounds, shuffling all filtered tracks');
           finalTracks = shuffleArray(filteredTracks);
         }
 
@@ -566,6 +598,7 @@ app.prepare().then(async () => {
           hostId: socket.id,
           tracks: finalTracks,
           categories: categories || [],
+          maxRounds: maxRounds || null,
           timer: null,
           timeRemaining: 30,
           roundFinders: new Set(),
@@ -577,7 +610,8 @@ app.prepare().then(async () => {
         currentRoom = code;
         currentPseudo = pseudo;
 
-        console.log(`Room ${code} créée par ${pseudo} avec ${finalTracks.length} tracks`);
+        console.log(`[DEBUG room:create] Room ${code} créée par ${pseudo} avec ${finalTracks.length} tracks (demandé: ${maxRounds})`);
+        console.log(`[DEBUG room:create] Track IDs:`, finalTracks.map(t => t.id));
         callback(code);
       } catch (error) {
         console.error('Erreur création room:', error);
@@ -688,8 +722,34 @@ app.prepare().then(async () => {
         // Recharger et refiltrer les tracks
         const allTracks = await loadTracks();
         const filteredTracks = filterTracksByCategories(allTracks, room.categories);
-        room.tracks = shuffleArray(filteredTracks);
 
+        // Respecter maxRounds si défini
+        let finalTracks = filteredTracks;
+        if (room.maxRounds && room.maxRounds > 0) {
+          // Grouper par catégorie
+          const tracksPerCategory = {};
+          for (const track of filteredTracks) {
+            if (!tracksPerCategory[track.categoryId]) {
+              tracksPerCategory[track.categoryId] = [];
+            }
+            tracksPerCategory[track.categoryId].push(track);
+          }
+
+          // Distribuer équitablement
+          const activeCategories = room.categories && room.categories.length > 0
+            ? room.categories
+            : Object.keys(tracksPerCategory);
+
+          finalTracks = distributeTracksEquitably(
+            activeCategories,
+            room.maxRounds,
+            tracksPerCategory
+          );
+        } else {
+          finalTracks = shuffleArray(filteredTracks);
+        }
+
+        room.tracks = finalTracks;
         room.isPlaying = true;
         room.currentTrackIndex = 0;
         room.roundFinders = new Set();
@@ -703,6 +763,8 @@ app.prepare().then(async () => {
         const currentTrack = room.tracks[room.currentTrackIndex];
         room.timeRemaining = currentTrack.timeLimit;
 
+        console.log(`[DEBUG game:start] Room ${currentRoom}: ${room.tracks.length} tracks (maxRounds: ${room.maxRounds})`);
+
         io.to(currentRoom).emit('game:start', {
           trackIndex: room.currentTrackIndex,
           audioFile: currentTrack.audioFile,
@@ -715,7 +777,7 @@ app.prepare().then(async () => {
         // Démarrer le timer
         startTimer(room, currentRoom, io);
 
-        console.log(`Partie lancée dans la room ${currentRoom}`);
+        console.log(`Partie lancée dans la room ${currentRoom} avec ${room.tracks.length} tracks`);
       } catch (error) {
         console.error('Erreur lancement partie:', error);
       }
