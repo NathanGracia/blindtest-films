@@ -793,12 +793,15 @@ app.prepare().then(async () => {
       const alreadyFound = room.roundFinders.has(socket.id);
 
       const currentTrack = room.tracks[room.currentTrackIndex];
-      // Ne pas vérifier si déjà trouvé
-      const isCorrect = !alreadyFound && checkAnswer(answer, currentTrack.acceptedAnswers);
 
-      // Vérifier si la réponse est proche (à 2 caractères près)
+      // Ne pas valider les réponses si le temps est écoulé (mais permettre le chat)
+      const canAnswer = room.timeRemaining > 0;
+      // Ne pas vérifier si déjà trouvé OU si le temps est écoulé
+      const isCorrect = canAnswer && !alreadyFound && checkAnswer(answer, currentTrack.acceptedAnswers);
+
+      // Vérifier si la réponse est proche (à 2 caractères près) - seulement si le temps est encore actif
       let isClose = false;
-      if (!isCorrect && !alreadyFound) {
+      if (canAnswer && !isCorrect && !alreadyFound) {
         const normalizedInput = normalizeAnswer(answer);
         for (const acceptedAnswer of currentTrack.acceptedAnswers) {
           const normalizedAccepted = normalizeAnswer(acceptedAnswer);
