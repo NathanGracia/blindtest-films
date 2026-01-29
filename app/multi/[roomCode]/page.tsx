@@ -509,6 +509,7 @@ export default function MultiGameRoom() {
             <Timer
               timeRemaining={timeRemaining}
               totalTime={room.currentTrack?.timeLimit || 30}
+              trackId={!showResult ? room.currentTrack?.trackId : undefined}
             />
 
             {/* Audio */}
