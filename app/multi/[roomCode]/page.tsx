@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
+import { normalizeAnswer } from '@/lib/utils';
 import Timer from '@/components/Timer';
 import AudioPlayer from '@/components/AudioPlayer';
 import PlayerList from '@/components/PlayerList';
@@ -10,6 +11,13 @@ import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
 import { Player, ChatMessage, RoomState, Category } from '@/types';
+
+interface TrackSuggestion {
+  title: string;
+  titleVF: string | null;
+  acceptedAnswers: string[];
+  categoryId: string;
+}
 
 const ICONS: Record<string, string> = {
   film: '🎬',
@@ -44,6 +52,10 @@ export default function MultiGameRoom() {
   const [volume, setVolume] = useState(0.7);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
+  const [allAnswers, setAllAnswers] = useState<TrackSuggestion[]>([]);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<TrackSuggestion[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
 
   // États pour le système de score Skribbl.io
   const [hasFoundThisRound, setHasFoundThisRound] = useState(false);
@@ -55,6 +67,7 @@ export default function MultiGameRoom() {
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const myId = socketRef.current.id;
 
@@ -72,6 +85,19 @@ export default function MultiGameRoom() {
     };
     loadCategories();
   }, []);
+
+  // Fonction pour charger les réponses disponibles
+  const loadAnswers = async (categoryIds: string[]) => {
+    try {
+      const res = await fetch(`/api/answers?categories=${categoryIds.join(',')}`);
+      if (res.ok) {
+        const answers = await res.json();
+        setAllAnswers(answers);
+      }
+    } catch (error) {
+      console.error('Erreur chargement réponses:', error);
+    }
+  };
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -106,6 +132,12 @@ export default function MultiGameRoom() {
             return;
           }
           setRoom(state);
+
+          // Charger les réponses disponibles
+          if (state.categories && state.categories.length > 0) {
+            loadAnswers(state.categories);
+          }
+
           if (state.isPlaying && state.currentTrack) {
             setIsPlaying(true);
             setTimeRemaining(state.timeRemaining);
@@ -135,6 +167,12 @@ export default function MultiGameRoom() {
               return;
             }
             setRoom(state);
+
+            // Charger les réponses disponibles
+            if (state.categories && state.categories.length > 0) {
+              loadAnswers(state.categories);
+            }
+
             if (state.isPlaying && state.currentTrack) {
               setIsPlaying(true);
               setTimeRemaining(state.timeRemaining);
@@ -323,11 +361,101 @@ export default function MultiGameRoom() {
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && dropdownRef.current) {
+      const selected = dropdownRef.current.children[selectedIndex] as HTMLElement;
+      selected?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedIndex]);
+
   const handleLeave = () => {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
     socketRef.current.emit('room:leave');
     try { sessionStorage.removeItem('blindtest_pseudo'); } catch {}
     router.push('/');
+  };
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+
+    if (!allAnswers || value.trim().length < 2 || !currentCategoryId) {
+      setShowDropdown(false);
+      return;
+    }
+
+    const normalized = normalizeAnswer(value);
+    const matches = allAnswers
+      .filter(track => {
+        // Filtrer uniquement par la catégorie actuelle
+        if (track.categoryId !== currentCategoryId) return false;
+
+        // Rechercher dans le titre VO
+        const titleNorm = normalizeAnswer(track.title);
+        if (titleNorm.includes(normalized)) return true;
+
+        // Rechercher dans le titre VF
+        if (track.titleVF) {
+          const titleVFNorm = normalizeAnswer(track.titleVF);
+          if (titleVFNorm.includes(normalized)) return true;
+        }
+
+        // Rechercher dans les réponses acceptées
+        return track.acceptedAnswers.some(answer => {
+          const answerNorm = normalizeAnswer(answer);
+          return answerNorm.includes(normalized);
+        });
+      })
+      .slice(0, 8);
+
+    setFilteredSuggestions(matches);
+    setShowDropdown(matches.length > 0);
+    setSelectedIndex(matches.length > 0 ? 0 : -1);
+  };
+
+  const selectSuggestion = (suggestion: TrackSuggestion) => {
+    setInput(suggestion.title);
+    setShowDropdown(false);
+    setSelectedIndex(-1);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown || filteredSuggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev =>
+          prev < filteredSuggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
+        break;
+      case 'Tab':
+        e.preventDefault();
+        selectSuggestion(filteredSuggestions[selectedIndex]);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowDropdown(false);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        selectSuggestion(filteredSuggestions[selectedIndex]);
+        break;
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -336,6 +464,7 @@ export default function MultiGameRoom() {
 
     socketRef.current.emit('game:answer', input.trim());
     setInput('');
+    setShowDropdown(false);
   };
 
   const handleStartGame = () => {
@@ -748,7 +877,8 @@ export default function MultiGameRoom() {
                     ref={inputRef}
                     type="text"
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     disabled={!isPlaying}
                     placeholder={
                       isPlaying
@@ -757,6 +887,9 @@ export default function MultiGameRoom() {
                     }
                     className="input-aero flex-1 px-4 py-3 text-white rounded-none border-0"
                     autoComplete="off"
+                    aria-autocomplete="list"
+                    aria-controls="autocomplete-dropdown"
+                    aria-expanded={showDropdown}
                   />
                   <button
                     type="submit"
@@ -767,6 +900,39 @@ export default function MultiGameRoom() {
                   </button>
                 </form>
               </div>
+
+              {showDropdown && filteredSuggestions.length > 0 && (
+                <div
+                  ref={dropdownRef}
+                  id="autocomplete-dropdown"
+                  role="listbox"
+                  className="absolute left-0 right-0 mt-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+                >
+                  {filteredSuggestions.map((suggestion, index) => {
+                    const displayText = suggestion.titleVF
+                      ? `${suggestion.title} - ${suggestion.titleVF}`
+                      : suggestion.title;
+
+                    return (
+                      <div
+                        key={index}
+                        role="option"
+                        aria-selected={index === selectedIndex}
+                        onClick={() => selectSuggestion(suggestion)}
+                        className={`px-4 py-3 cursor-pointer transition-colors ${
+                          index === selectedIndex
+                            ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white font-semibold'
+                            : index === 0 && selectedIndex === -1
+                              ? 'bg-[#4a90d9]/20 border-l-2 border-[#4a90d9]/50 text-white'
+                              : 'hover:bg-white/10 text-white/90'
+                        }`}
+                      >
+                        {displayText}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Message hint en bas */}
               {hintMessage && (

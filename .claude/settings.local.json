@@ -50,7 +50,9 @@
       "Bash(sqlite3:*)",
       "Bash(timeout 30 tail:*)",
       "Bash(powershell -Command:*)",
-      "Bash(powershell \"Stop-Process -Name node -Force\")"
+      "Bash(powershell \"Stop-Process -Name node -Force\")",
+      "Bash(grep:*)",
+      "Bash(timeout:*)"
     ]
   }
 }
