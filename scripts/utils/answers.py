@@ -90,19 +90,11 @@ def extract_keywords(title: str, max_keywords: int = 3) -> List[str]:
     # Split into words
     words = clean_title.lower().split()
 
-    # Filter out common words
-    stop_words = {
-        'the', 'a', 'an', 'of', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-        'le', 'la', 'les', 'de', 'des', 'du', 'et', 'ou', 'dans', 'sur', 'avec',
-        'part', 'volume', 'chapter', 'episode', 'season', 'series',
-        'partie', 'tome', 'chapitre', 'saison',
-    }
+    # Keep all words (no stop words filtering)
+    keywords = [word for word in words if len(word) > 0]
 
-    keywords = [word for word in words if word not in stop_words and len(word) > 2]
-
-    # Return top keywords (sorted by length, longer first)
-    keywords.sort(key=len, reverse=True)
-    return keywords[:max_keywords]
+    # Return all keywords (no limit)
+    return keywords
 
 
 def generate_acronym(title: str) -> Optional[str]:
@@ -184,11 +176,6 @@ def generate_accepted_answers(title: str, title_vf: Optional[str] = None) -> Lis
     if keywords:
         keywords_str = ' '.join(keywords)
         answers.add(keywords_str)
-
-    # Acronym
-    acronym = generate_acronym(title)
-    if acronym:
-        answers.add(acronym)
 
     # Process French title if provided
     if title_vf:

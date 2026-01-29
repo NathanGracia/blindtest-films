@@ -119,6 +119,9 @@ class YouTubeDownloader:
             'no_warnings': True,
             'default_search': 'ytsearch1',  # Search YouTube, first result
             'socket_timeout': YOUTUBE_DOWNLOAD_TIMEOUT,
+            # Anti-bot measures
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
 
         # Add ffmpeg location if detected
@@ -180,6 +183,9 @@ class YouTubeDownloader:
             'quiet': True,
             'no_warnings': True,
             'socket_timeout': YOUTUBE_DOWNLOAD_TIMEOUT,
+            # Anti-bot measures
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
 
         # Add ffmpeg location if detected
@@ -251,6 +257,9 @@ class YouTubeDownloader:
             'default_search': 'ytsearch1',  # Search YouTube, first result
             'socket_timeout': YOUTUBE_DOWNLOAD_TIMEOUT,
             'writethumbnail': True,  # Download thumbnail
+            # Anti-bot measures
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
 
         # Add ffmpeg location if detected
