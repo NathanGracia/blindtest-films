@@ -162,6 +162,7 @@ async function createPublicRoom() {
       isPublic: true,
       startCountdown: null,
       startCountdownValue: 10,
+      categoryStats: {}, // Stats par joueur: { playerId: { categoryId: count } }
     };
     rooms.set(PUBLIC_ROOM_CODE, publicRoom);
     console.log(`Room publique ${PUBLIC_ROOM_CODE} créée avec ${limitedTracks.length} tracks répartis équitablement`);
@@ -340,6 +341,7 @@ async function startPublicGame(room) {
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
+    room.categoryStats = {}; // Reset stats de catégories
 
     // Reset scores et états des joueurs
     room.players.forEach(p => {
@@ -357,6 +359,7 @@ async function startPublicGame(room) {
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
+      categoryId: currentTrack.categoryId,
     });
 
     // Démarrer le timer
@@ -433,6 +436,7 @@ async function nextTrackPublic(room) {
     if (ioInstance) {
       ioInstance.to(PUBLIC_ROOM_CODE).emit('game:end', {
         players: sortedPlayers,
+        categoryStats: room.categoryStats,
       });
     }
     console.log(`Room publique: partie terminée, ${room.players.length} joueurs`);
@@ -478,6 +482,7 @@ async function nextTrackPublic(room) {
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
+      categoryId: currentTrack.categoryId,
     });
   }
 
@@ -574,6 +579,7 @@ app.prepare().then(async () => {
           timeRemaining: 30,
           roundFinders: new Set(),
           deletionTimer: null,
+          categoryStats: {}, // Stats par joueur: { playerId: { categoryId: count } }
         };
 
         rooms.set(code, room);
@@ -672,6 +678,7 @@ app.prepare().then(async () => {
           imageFile: currentTrack.imageFile,
           timeLimit: currentTrack.timeLimit,
           startTime: currentTrack.startTime || 0,
+          categoryId: currentTrack.categoryId,
         } : null,
         totalTracks: room.tracks.length,
         categories: room.categories,
@@ -723,6 +730,7 @@ app.prepare().then(async () => {
         room.isPlaying = true;
         room.currentTrackIndex = 0;
         room.roundFinders = new Set();
+        room.categoryStats = {}; // Reset stats de catégories
 
         // Reset scores et états
         room.players.forEach(p => {
@@ -740,6 +748,7 @@ app.prepare().then(async () => {
           timeLimit: currentTrack.timeLimit,
           startTime: currentTrack.startTime || 0,
           totalTracks: room.tracks.length,
+          categoryId: currentTrack.categoryId,
         });
 
         // Démarrer le timer
@@ -828,6 +837,13 @@ app.prepare().then(async () => {
           player.score += scoreEarned;
           player.hasFoundThisRound = true;
         }
+
+        // Tracker les stats par catégorie
+        if (!room.categoryStats[socket.id]) {
+          room.categoryStats[socket.id] = {};
+        }
+        const categoryId = currentTrack.categoryId;
+        room.categoryStats[socket.id][categoryId] = (room.categoryStats[socket.id][categoryId] || 0) + 1;
 
         // Notification privée au joueur qui a trouvé
         socket.emit('game:you-found', {
@@ -1021,6 +1037,7 @@ app.prepare().then(async () => {
       room.isPlaying = false;
       io.to(roomCode).emit('game:end', {
         players: room.players.sort((a, b) => b.score - a.score),
+        categoryStats: room.categoryStats,
       });
       return;
     }
@@ -1035,6 +1052,7 @@ app.prepare().then(async () => {
       timeLimit: currentTrack.timeLimit,
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
+      categoryId: currentTrack.categoryId,
     });
 
     startTimer(room, roomCode, io);

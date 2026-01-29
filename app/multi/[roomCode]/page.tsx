@@ -9,7 +9,16 @@ import PlayerList from '@/components/PlayerList';
 import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
-import { Player, ChatMessage, RoomState } from '@/types';
+import { Player, ChatMessage, RoomState, Category } from '@/types';
+
+const ICONS: Record<string, string> = {
+  film: '🎬',
+  tv: '📺',
+  gamepad: '🎮',
+  sparkles: '✨',
+  music: '🎵',
+  default: '📁',
+};
 
 export default function MultiGameRoom() {
   const params = useParams();
@@ -30,8 +39,11 @@ export default function MultiGameRoom() {
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [finalScores, setFinalScores] = useState<Player[]>([]);
+  const [categoryStats, setCategoryStats] = useState<Record<string, Record<string, number>>>({});
   const [publicCountdown, setPublicCountdown] = useState<number | null>(null);
   const [volume, setVolume] = useState(0.7);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
 
   // États pour le système de score Skribbl.io
   const [hasFoundThisRound, setHasFoundThisRound] = useState(false);
@@ -45,6 +57,21 @@ export default function MultiGameRoom() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const myId = socketRef.current.id;
+
+  // Charger les catégories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await fetch('/api/categories');
+        if (res.ok) {
+          setCategories(await res.json());
+        }
+      } catch (error) {
+        console.error('Erreur chargement catégories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -82,6 +109,7 @@ export default function MultiGameRoom() {
           if (state.isPlaying && state.currentTrack) {
             setIsPlaying(true);
             setTimeRemaining(state.timeRemaining);
+            setCurrentCategoryId((state.currentTrack as any).categoryId || null);
           }
           // Si room publique avec countdown en cours
           if (state.isPublic && state.isCountingDown && state.startCountdownValue) {
@@ -110,6 +138,7 @@ export default function MultiGameRoom() {
             if (state.isPlaying && state.currentTrack) {
               setIsPlaying(true);
               setTimeRemaining(state.timeRemaining);
+              setCurrentCategoryId((state.currentTrack as any).categoryId || null);
             }
             // Si room publique avec countdown en cours
             if (state.isPublic && state.isCountingDown && state.startCountdownValue) {
@@ -141,7 +170,7 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:start', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
+    socket.on('game:start', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
@@ -159,6 +188,7 @@ export default function MultiGameRoom() {
       setWinnerId(null);
       setResultImage(null);
       setIsFinished(false);
+      setCurrentCategoryId(data.categoryId || null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -209,7 +239,7 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number }) => {
+    socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string }) => {
       // Arrêter la musique actuelle avant de passer à la suivante
       setIsPlaying(false);
       setRoom((prev) => {
@@ -227,6 +257,7 @@ export default function MultiGameRoom() {
       setResultImage(null);
       setResultTrackId(null);
       setIsPlaying(true);
+      setCurrentCategoryId(data.categoryId || null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -234,9 +265,10 @@ export default function MultiGameRoom() {
       setRoundFinders([]);
     });
 
-    socket.on('game:end', (data: { players: Player[] }) => {
+    socket.on('game:end', (data: { players: Player[]; categoryStats?: Record<string, Record<string, number>> }) => {
       setIsFinished(true);
       setFinalScores(data.players);
+      setCategoryStats(data.categoryStats || {});
       setIsPlaying(false);
       setShowResult(false);
     });
@@ -333,24 +365,54 @@ export default function MultiGameRoom() {
           </div>
           <h1 className="text-3xl font-bold text-white mb-6 text-glow">Partie terminée !</h1>
           <div className="space-y-3 mb-8">
-            {finalScores.map((player, index) => (
-              <div
-                key={player.id}
-                className={`flex items-center justify-between p-4 rounded-xl ${
-                  index === 0
-                    ? 'bg-[#7fba00]/20 border border-[#7fba00]/50 glow-green'
-                    : 'bg-white/5 border border-white/10'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
-                  </span>
-                  <span className="text-white font-semibold">{player.pseudo}</span>
+            {finalScores.map((player, index) => {
+              const playerStats = categoryStats[player.id] || {};
+              const hasStats = Object.keys(playerStats).length > 0;
+
+              return (
+                <div
+                  key={player.id}
+                  className={`p-4 rounded-xl ${
+                    index === 0
+                      ? 'bg-[#7fba00]/20 border border-[#7fba00]/50 glow-green'
+                      : 'bg-white/5 border border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
+                      </span>
+                      <span className="text-white font-semibold">{player.pseudo}</span>
+                    </div>
+                    <span className="text-[#7fba00] font-bold text-xl">{player.score}</span>
+                  </div>
+
+                  {hasStats && (
+                    <div className="flex flex-wrap gap-2 mt-2 pl-10">
+                      {Object.entries(playerStats).map(([categoryId, count]) => {
+                        const category = categories.find((c) => c.id === categoryId);
+                        if (!category) return null;
+                        const icon = ICONS[category.icon] || ICONS.default;
+
+                        return (
+                          <div
+                            key={categoryId}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg glass"
+                            style={{ borderColor: category.color, borderWidth: '1px' }}
+                          >
+                            <span style={{ color: category.color }} className="text-sm">
+                              {icon}
+                            </span>
+                            <span className="text-white/80 text-sm font-medium">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <span className="text-[#7fba00] font-bold text-xl">{player.score}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {room.isPublic && publicCountdown !== null && (
             <div className="glass rounded-xl p-6 mb-4">
@@ -591,6 +653,28 @@ export default function MultiGameRoom() {
                     <ReportButton trackId={resultTrackId} />
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Catégorie */}
+            {currentCategoryId && !showResult && (
+              <div className="flex justify-center">
+                {(() => {
+                  const category = categories.find((c) => c.id === currentCategoryId);
+                  if (!category) return null;
+                  const icon = ICONS[category.icon] || ICONS.default;
+                  return (
+                    <div
+                      className="glass rounded-xl px-4 py-2 flex items-center gap-2"
+                      style={{ borderColor: category.color, borderWidth: '2px' }}
+                    >
+                      <span style={{ color: category.color }} className="text-xl">
+                        {icon}
+                      </span>
+                      <span className="text-white font-semibold">{category.name}</span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
