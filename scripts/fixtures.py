@@ -6,6 +6,7 @@ Can run all categories or specific ones via CLI.
 import argparse
 import sys
 import os
+from pathlib import Path
 from typing import List, Optional
 from tqdm import tqdm
 
@@ -15,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.config import OMDB_API_KEY, API_BASE_URL, validate_config
 from scripts.importers.films import FilmsImporter
 from scripts.importers.cartoons import CartoonImporter
+from scripts.importers.csv_importer import CSVImporter
 
 
 # Map category names to importer classes
@@ -117,6 +119,12 @@ Examples:
 
   # Force re-import existing tracks
   python scripts/fixtures.py --categories films --no-skip-existing
+
+  # Import from CSV (with YouTube thumbnails)
+  python scripts/fixtures.py --csv data.csv
+
+  # Import CSV to production
+  python scripts/fixtures.py --csv data.csv --api-url https://blindtest.nathangracia.com
         """
     )
 
@@ -128,6 +136,11 @@ Examples:
         '--categories', '-c',
         nargs='+',
         help=f'Categories to import (available: {", ".join(IMPORTERS.keys())})'
+    )
+    parser.add_argument(
+        '--csv',
+        type=Path,
+        help='Import from CSV file (format: title,titleVF,youtube_url,category_id)'
     )
     parser.add_argument(
         '--limit', '-l',
@@ -170,6 +183,41 @@ Examples:
         for warning in warnings:
             print(f"  ⚠ {warning}")
         print()
+
+    # Handle CSV import mode
+    if args.csv:
+        if not args.csv.exists():
+            print(f"Error: CSV file not found: {args.csv}")
+            sys.exit(1)
+
+        print(f"CSV Import Mode")
+        print(f"File: {args.csv}")
+        print(f"API URL: {args.api_url}")
+        print()
+
+        importer = CSVImporter(
+            csv_file=args.csv,
+            api_base_url=args.api_url
+        )
+
+        try:
+            skip_existing = not args.no_skip_existing
+            stats = importer.import_all(
+                skip_existing=skip_existing,
+                max_items=args.limit
+            )
+
+            print_stats("CSV", stats)
+            print("\n[OK] CSV import completed!")
+        except KeyboardInterrupt:
+            print("\n\nImport interrupted by user")
+        except Exception as e:
+            print(f"\n[FAIL] Error importing CSV: {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+
+        sys.exit(0)
 
     # Get categories to import
     categories = args.categories if args.categories else list(IMPORTERS.keys())
