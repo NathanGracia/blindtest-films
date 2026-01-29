@@ -184,12 +184,30 @@ export default function Home() {
             </div>
           )}
 
-          {/* Bouton Créer partie privée */}
+          {/* Bouton Rejoindre partie publique */}
           <div className="mb-4">
+            <button
+              onClick={handleJoinPublic}
+              disabled={isLoading}
+              className="btn-aero-green flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl disabled:opacity-50"
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Connexion...
+                </span>
+              ) : (
+                '🌍 Rejoindre la partie publique (🏆classée)'
+              )}
+            </button>
+          </div>
+
+          {/* Bouton Créer partie privée */}
+          <div className="mb-6">
             <button
               onClick={handleCreatePrivate}
               disabled={isLoading}
-              className="btn-aero-green flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl disabled:opacity-50"
+              className="btn-aero flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl disabled:opacity-50"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -200,25 +218,6 @@ export default function Home() {
                 '🎮 Créer une partie privée'
               )}
             </button>
-          </div>
-
-          {/* Bouton Rejoindre partie publique */}
-          <div className="mb-6">
-            <button
-              onClick={handleJoinPublic}
-              disabled={isLoading}
-              className="btn-aero flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl disabled:opacity-50"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Connexion...
-                </span>
-              ) : (
-                '🌍 Rejoindre partie publique (🏆classée)'
-              )}
-            </button>
-        
           </div>
 
           {/* Rejoindre avec code - Input + Bouton sur même ligne */}
