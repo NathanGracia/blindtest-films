@@ -48,7 +48,8 @@
       "Bash(node check-db.js:*)",
       "Bash(del \"C:\\\\Users\\\\nathan\\\\Documents\\\\projets\\\\blindtest-films\\\\app\\\\game\\\\page.tsx\")",
       "Bash(sqlite3:*)",
-      "Bash(timeout 30 tail:*)"
+      "Bash(timeout 30 tail:*)",
+      "Bash(powershell -Command:*)"
     ]
   }
 }
