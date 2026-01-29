@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '100mb'
     },
     // Augmenter la limite pour les API routes et middleware (100MB)
-    clientMaxBodySize: 100 * 1024 * 1024 // 100MB en bytes
+    proxyClientMaxBodySize: 100 * 1024 * 1024 // 100MB en bytes
   }
 };
 
