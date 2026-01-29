@@ -38,6 +38,9 @@ python scripts/fixtures.py --csv data/my_import.csv --limit 5
 
 # Forcer la réimportation
 python scripts/fixtures.py --csv data/my_import.csv --no-skip-existing
+
+# Exclure les titres VF des réponses acceptées
+python scripts/fixtures.py --csv data/my_import.csv --no-vf-answers
 ```
 
 ### Import en production
@@ -80,6 +83,16 @@ Les réponses acceptées sont générées automatiquement à partir de:
 - Variations sans articles (the, le, la, les, etc.)
 - Normalisation (accents, casse)
 
+**Option `--no-vf-answers`**
+
+Par défaut, les titres VF sont inclus dans les réponses acceptées. Pour certains imports (ex: jeux vidéo où seul le titre anglais est pertinent), vous pouvez exclure les titres VF des réponses :
+
+```bash
+python scripts/fixtures.py --csv games.csv --no-vf-answers
+```
+
+⚠️ Note : Le `titleVF` reste enregistré dans la base de données, mais ne sera pas accepté comme réponse valide
+
 ### Recherche YouTube
 
 Si `youtube_url` est vide, le script:
@@ -121,6 +134,20 @@ The Godfather,Le Parrain,,films
 
 ```bash
 python scripts/fixtures.py --csv mixed.csv --api-url https://blindtest.nathangracia.com
+```
+
+### Import de jeux vidéo (sans titres VF)
+
+```csv
+title,titleVF,youtube_url,category_id
+The Legend of Zelda,La Légende de Zelda,,games
+Final Fantasy VII,,,games
+Dark Souls,,,games
+```
+
+```bash
+# Les titres VF ne seront pas acceptés comme réponses
+python scripts/fixtures.py --csv games.csv --no-vf-answers --api-url https://blindtest.nathangracia.com
 ```
 
 ### Test rapide avant production

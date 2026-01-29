@@ -173,6 +173,11 @@ Examples:
         default=API_BASE_URL,
         help=f'Override API URL (default: {API_BASE_URL})'
     )
+    parser.add_argument(
+        '--no-vf-answers',
+        action='store_true',
+        help='Exclude French titles from accepted answers (CSV import only)'
+    )
 
     args = parser.parse_args()
 
@@ -197,7 +202,8 @@ Examples:
 
         importer = CSVImporter(
             csv_file=args.csv,
-            api_base_url=args.api_url
+            api_base_url=args.api_url,
+            include_vf_answers=not args.no_vf_answers
         )
 
         try:

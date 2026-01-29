@@ -21,7 +21,7 @@ except ImportError:
 class CSVImporter(BaseImporter):
     """Importer for generic CSV files."""
 
-    def __init__(self, csv_file: Path, category_id: Optional[str] = None, api_base_url: Optional[str] = None):
+    def __init__(self, csv_file: Path, category_id: Optional[str] = None, api_base_url: Optional[str] = None, include_vf_answers: bool = True):
         """
         Initialize CSV importer.
 
@@ -29,6 +29,7 @@ class CSVImporter(BaseImporter):
             csv_file: Path to CSV file
             category_id: Override category ID (if not using CSV column)
             api_base_url: API base URL
+            include_vf_answers: Include French titles in accepted answers (default: True)
         """
         # Use 'csv' as placeholder category - actual category comes from CSV
         super().__init__(
@@ -37,6 +38,7 @@ class CSVImporter(BaseImporter):
         )
         self.csv_file = csv_file
         self.override_category = category_id
+        self.include_vf_answers = include_vf_answers
 
     def get_media_list(self) -> List[Dict[str, Any]]:
         """
@@ -116,7 +118,8 @@ class CSVImporter(BaseImporter):
         Returns:
             Tuple of (audio_path, image_path)
         """
-        from scripts.config import AUDIO_DIR
+        from scripts.config import AUDIO_DIR, FFMPEG_PATH
+        from pathlib import Path
         import yt_dlp
 
         output_audio_path = AUDIO_DIR / f"{filename}.mp3"
@@ -141,6 +144,10 @@ class CSVImporter(BaseImporter):
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
+
+        # Add ffmpeg location if detected
+        if FFMPEG_PATH:
+            ydl_opts['ffmpeg_location'] = str(Path(FFMPEG_PATH).parent)
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -209,7 +216,8 @@ class CSVImporter(BaseImporter):
         # Generate accepted answers
         title = metadata['title']
         title_vf = metadata.get('titleVF')
-        accepted_answers = generate_accepted_answers(title, title_vf)
+        # Only include VF in answers if include_vf_answers is True
+        accepted_answers = generate_accepted_answers(title, title_vf if self.include_vf_answers else None)
 
         # Get category from metadata
         category_id = metadata.get('category_id', self.category_id)
@@ -273,6 +281,7 @@ Examples:
     parser.add_argument('--api-url', help='API base URL (default: http://localhost:3000)')
     parser.add_argument('--limit', '-l', type=int, help='Limit number of items to import')
     parser.add_argument('--no-skip-existing', action='store_true', help='Re-import existing tracks')
+    parser.add_argument('--no-vf-answers', action='store_true', help='Exclude French titles from accepted answers')
 
     args = parser.parse_args()
 
@@ -283,7 +292,8 @@ Examples:
     importer = CSVImporter(
         csv_file=args.csv_file,
         category_id=args.category,
-        api_base_url=args.api_url
+        api_base_url=args.api_url,
+        include_vf_answers=not args.no_vf_answers
     )
 
     stats = importer.import_all(

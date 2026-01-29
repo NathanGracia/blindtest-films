@@ -11,14 +11,14 @@ from typing import Dict, List, Optional, Any
 from slugify import slugify
 
 try:
-    from scripts.config import DEFAULT_TIME_LIMIT, DEFAULT_START_TIME, IMAGES_DIR
+    from scripts.config import DEFAULT_TIME_LIMIT, DEFAULT_START_TIME, IMAGES_DIR, FFMPEG_PATH
     from scripts.utils.api_client import TrackAPIClient
     from scripts.utils.omdb import OMDbClient
     from scripts.utils.youtube import YouTubeDownloader
     from scripts.utils.answers import generate_accepted_answers
     from scripts.utils.files import download_image
 except ImportError:
-    from ..config import DEFAULT_TIME_LIMIT, DEFAULT_START_TIME, IMAGES_DIR
+    from ..config import DEFAULT_TIME_LIMIT, DEFAULT_START_TIME, IMAGES_DIR, FFMPEG_PATH
     from ..utils.api_client import TrackAPIClient
     from ..utils.omdb import OMDbClient
     from ..utils.youtube import YouTubeDownloader
@@ -41,7 +41,7 @@ class BaseImporter(ABC):
         self.category_id = category_id
         self.api_client = TrackAPIClient(api_base_url)
         self.omdb_client = OMDbClient(omdb_api_key) if omdb_api_key else None
-        self.youtube_dl = YouTubeDownloader()
+        self.youtube_dl = YouTubeDownloader(ffmpeg_path=FFMPEG_PATH)
 
     @abstractmethod
     def get_media_list(self) -> List[Dict[str, Any]]:
