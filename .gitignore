@@ -171,3 +171,4 @@ dmypy.json
 scripts/import_errors.log
 scripts/*.log
 nul
+public/audio/

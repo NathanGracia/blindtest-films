@@ -110,6 +110,17 @@ export default function AudioPlayer({ trackId, isPlaying, startTime = 0, volume 
     onError?.();
   }, [onError]);
 
+  // Handle audio ended - restart from startTime for looping
+  const handleEnded = useCallback(() => {
+    if (audioRef.current && isPlaying) {
+      audioRef.current.currentTime = startTime;
+      audioRef.current.play().catch(() => {
+        setHasError(true);
+        onError?.();
+      });
+    }
+  }, [isPlaying, startTime, onError]);
+
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative">
@@ -192,6 +203,7 @@ export default function AudioPlayer({ trackId, isPlaying, startTime = 0, volume 
         preload="auto"
         onCanPlay={handleCanPlay}
         onError={handleError}
+        onEnded={handleEnded}
       />
     </div>
   );

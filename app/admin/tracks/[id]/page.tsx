@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Category, Track } from '@/types';
 import FileUpload from '@/components/admin/FileUpload';
+import SelectListbox from '@/components/SelectListbox';
 import TagInput from '@/components/admin/TagInput';
 
 export default function EditTrackPage({ params }: { params: Promise<{ id: string }> }) {
@@ -268,18 +269,13 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
               <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
                 Catégorie *
               </label>
-              <select
+              <SelectListbox
+                options={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="input-aero w-full px-4 py-3 text-white rounded-xl"
-                required
-              >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setCategoryId(v)}
+                className="w-full"
+                placeholder="Sélectionne une catégorie"
+              />
             </div>
 
             <div>
