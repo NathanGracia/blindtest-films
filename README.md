@@ -6,9 +6,12 @@ Application de blindtest musical pour films, séries, jeux vidéo et anime. Styl
 
 - **Mode Solo** : Devinez le film avec un temps limité
 - **Mode Multijoueur** : Jouez en temps réel avec vos amis
-- **Système de score** : Points basés sur la vitesse de réponse
+- **Système de score** : Points basés sur la vitesse de réponse (jusqu'à 1000 pts)
+- **Système de vies** : 3 vies par track pour les suggestions automatiques
+- **Autocomplétion intelligente** : Suggestions de réponses en temps réel
 - **Interface Admin** : Gestion des tracks et catégories
 - **Import automatique** : Scripts Python pour importer des médias depuis OMDb et YouTube
+- **Normalisation audio** : Volume cohérent à -16 LUFS pour tous les tracks
 
 ## 🚀 Installation
 
@@ -66,6 +69,79 @@ Cela va créer :
 - La base de données SQLite (`prisma/dev.db`)
 - Les tables (Category, Track)
 - Les catégories de base (films, series, jeux, anime)
+
+## 🎮 Système de gameplay
+
+### Scoring
+
+Le système de points est inspiré de Skribbl.io :
+
+- **Score de base** : 100 points minimum
+- **Bonus vitesse** : jusqu'à +900 points selon la rapidité
+- **Formule** : `score = 100 + (900 × tempsRestant / tempsMax)`
+- **Maximum** : 1000 points (réponse instantanée)
+- **Multijoueur** : +200 points bonus pour le premier joueur à trouver
+
+**Exemple** :
+- Track de 30 secondes, réponse trouvée à 25s → `100 + (900 × 25/30)` = 850 points
+- Premier à trouver en multijoueur → 850 + 200 = 1050 points
+
+### Système de vies
+
+Chaque track dispose d'un **système de 3 vies** pour limiter les tentatives via suggestions :
+
+#### Comment ça marche ?
+
+1. **3 vies par track** (❤️❤️❤️) - reset à chaque nouveau round
+2. **Autocomplétion intelligente** : Tapez 2+ caractères pour voir les suggestions
+3. **Deux types de réponses** :
+   - **Sélection de suggestion** (titre exact) → Coûte 1 vie si faux ❤️ → 🖤
+   - **Saisie libre** (texte personnalisé) → Aucun coût, chat public
+
+#### Exemples
+
+**Scénario 1 : Utilisation des suggestions**
+```
+Joueur tape "avatar"
+→ Suggestions : "Avatar", "Avatar: The Way of Water"
+→ Sélectionne "Avatar" (mauvaise réponse)
+→ Perd 1 vie : ❤️❤️🖤
+→ Encore 2 tentatives disponibles
+```
+
+**Scénario 2 : Saisie libre**
+```
+Joueur tape "c'est le film avec les aliens bleus"
+→ Pas de suggestion correspondante
+→ Message envoyé dans le chat public
+→ Aucune vie perdue : ❤️❤️❤️
+```
+
+#### Détails techniques
+
+- **Vérification côté serveur** : Impossible à contourner
+- **Comparaison normalisée** : "Avatar" = "avatar" = "AVATAR"
+- **Titres VO et VF** : Les deux comptent comme suggestions
+- **0 vie** : Suggestions masquées, chat toujours actif
+- **Réinitialisation** : 3 vies au début de chaque nouveau track
+
+#### Avantages
+
+✅ Empêche le spam de toutes les suggestions
+✅ Encourage la réflexion avant de cliquer
+✅ Permet toujours la discussion libre via le chat
+✅ Maintient l'aspect social du jeu
+
+### Proximité des réponses
+
+Si votre réponse est **proche** (distance de Levenshtein ≤ 2 caractères) :
+- Message privé : "🔥 Vous êtes proche !"
+- Ne consomme pas de vie
+- Encourage à réessayer avec une variante
+
+**Exemples** :
+- Réponse : "Avengers" → Correct : "The Avengers" → 🔥 Proche !
+- Réponse : "Interstella" → Correct : "Interstellar" → 🔥 Proche !
 
 ## 📦 Hydratation de la base de données
 

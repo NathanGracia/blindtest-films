@@ -125,6 +125,47 @@ score = 100 + (800 * tempsRestant / tempsMax)
 2. Match exact dans `acceptedAnswers`
 3. Distance Levenshtein <= 2 : affiche "Vous etes proche !"
 
+### Systeme de vies (server.js + page.tsx)
+**Objectif** : Limiter les tentatives via suggestions pour éviter le spam
+
+**Fonctionnement** :
+- Chaque joueur a **3 vies** par track (reset à chaque round)
+- Les vies sont affichées en cœurs : ❤️❤️❤️ / ❤️❤️🖤 / ❤️🖤🖤 / 🖤🖤🖤
+- **Perte de vie** : réponse incorrecte qui correspond à un titre VO ou VF exact d'un track de la catégorie
+- **Pas de perte** : saisie libre qui ne correspond pas à un titre exact
+
+**Logique serveur** :
+```javascript
+// Cache global chargé au démarrage
+let allTracksCache = []; // Tous les tracks en mémoire
+
+// Vérification automatique côté serveur
+function isAnswerFromSuggestion(answer, categoryId) {
+  const normalized = normalizeAnswer(answer);
+  return allTracksCache.some(track =>
+    track.categoryId === categoryId &&
+    (normalizeAnswer(track.title) === normalized ||
+     normalizeAnswer(track.titleVF) === normalized)
+  );
+}
+
+// Dans game:answer handler
+if (isAnswerFromSuggestion(answer, currentTrack.categoryId) && !isCorrect) {
+  socket.emit('game:wrong-answer'); // Déclenche perte de vie côté client
+}
+```
+
+**Logique client** :
+- État `remainingLives` (3 → 2 → 1 → 0)
+- Listener `game:wrong-answer` décrémente les vies
+- Dropdown de suggestions masqué si `remainingLives === 0`
+- Chat toujours actif même à 0 vie (permet discussion et saisie libre)
+
+**Avantages** :
+- ✅ Vérification côté serveur = impossible à contourner
+- ✅ Comparaison directe avec les vrais titres (pas de tracking de flag)
+- ✅ Simple et fiable : titre exact = suggestion, sinon = chat libre
+
 ### Multijoueur (server.js)
 - Room publique "PUBLIC" : permanente, 25 tracks, countdown 30s
 - Rooms privees : code 6 caracteres (ABC123)
