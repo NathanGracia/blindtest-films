@@ -126,6 +126,31 @@ async function loadTracks() {
   }));
 }
 
+// Cache global de tous les tracks pour vérification des suggestions
+let allTracksCache = [];
+
+// Vérifier si la réponse correspond à un titre VO ou VF d'un track de la catégorie
+function isAnswerFromSuggestion(answer, categoryId) {
+  const normalizedAnswer = normalizeAnswer(answer);
+
+  // Chercher dans les tracks de la catégorie actuelle
+  for (const track of allTracksCache) {
+    if (track.categoryId !== categoryId) continue;
+
+    // Vérifier titre VO
+    if (normalizeAnswer(track.title) === normalizedAnswer) {
+      return true;
+    }
+
+    // Vérifier titre VF si disponible
+    if (track.titleVF && normalizeAnswer(track.titleVF) === normalizedAnswer) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Stockage des rooms en mémoire
 const rooms = new Map();
 
@@ -492,6 +517,10 @@ async function nextTrackPublic(room) {
 app.prepare().then(async () => {
   // Créer la room publique au démarrage
   await createPublicRoom();
+
+  // Charger le cache de tous les tracks pour vérification des suggestions
+  allTracksCache = await loadTracks();
+  console.log(`[CACHE] ${allTracksCache.length} tracks chargés en cache`);
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
@@ -771,6 +800,11 @@ app.prepare().then(async () => {
 
       const currentTrack = room.tracks[room.currentTrackIndex];
 
+      // Vérifier si la réponse vient d'une suggestion (titre VO ou VF exact)
+      const isFromSuggestion = isAnswerFromSuggestion(answer, currentTrack.categoryId);
+
+      console.log(`[ANSWER] ${currentPseudo}: "${answer}" (fromSuggestion: ${isFromSuggestion})`);
+
       // Ne pas valider les réponses si le temps est écoulé (mais permettre le chat)
       const canAnswer = room.timeRemaining > 0;
       // Ne pas vérifier si déjà trouvé OU si le temps est écoulé
@@ -819,6 +853,12 @@ app.prepare().then(async () => {
         // Envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', foundMessage);
       } else {
+        // Mauvaise réponse depuis suggestion : perdre une vie
+        if (isFromSuggestion && canAnswer && !alreadyFound) {
+          console.log(`[LIVES] ${currentPseudo} perd une vie (mauvaise réponse depuis suggestion)`);
+          socket.emit('game:wrong-answer');
+        }
+
         // Tous les autres messages (mauvaises réponses, messages après avoir trouvé) : envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', chatMessage);
       }

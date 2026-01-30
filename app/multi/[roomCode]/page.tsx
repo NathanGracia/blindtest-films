@@ -64,6 +64,9 @@ export default function MultiGameRoom() {
   const [roundFinders, setRoundFinders] = useState<{id: string; pseudo: string}[]>([]);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
 
+  // Système de points de vie
+  const [remainingLives, setRemainingLives] = useState(3);
+
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +240,8 @@ export default function MultiGameRoom() {
       setMyScoreThisRound(null);
       setFindersCount(0);
       setRoundFinders([]);
+      // Reset vies
+      setRemainingLives(3);
     });
 
     socket.on('game:tick', (time: number) => {
@@ -251,6 +256,16 @@ export default function MultiGameRoom() {
     socket.on('chat:hint', (data: { message: string }) => {
       setHintMessage(data.message);
       setTimeout(() => setHintMessage(null), 3000);
+    });
+
+    // Réponse incorrecte depuis suggestion
+    socket.on('game:wrong-answer', () => {
+      console.log('[LIVES] Mauvaise réponse ! Perte d\'une vie');
+      setRemainingLives(prev => {
+        const newLives = Math.max(0, prev - 1);
+        console.log('[LIVES] Vies restantes:', newLives);
+        return newLives;
+      });
     });
 
     // Notification privée: tu as trouvé la réponse
@@ -306,6 +321,8 @@ export default function MultiGameRoom() {
       setMyScoreThisRound(null);
       setFindersCount(0);
       setRoundFinders([]);
+      // Reset vies
+      setRemainingLives(3);
     });
 
     socket.on('game:end', (data: { players: Player[]; categoryStats?: Record<string, Record<string, number>> }) => {
@@ -351,6 +368,7 @@ export default function MultiGameRoom() {
       socket.off('game:end');
       socket.off('public:countdown');
       socket.off('public:restart-countdown');
+      socket.off('game:wrong-answer');
     };
   }, [router, roomCode]);
 
@@ -393,7 +411,7 @@ export default function MultiGameRoom() {
   const handleInputChange = (value: string) => {
     setInput(value);
 
-    if (!allAnswers || value.trim().length < 2 || !currentCategoryId) {
+    if (!allAnswers || value.trim().length < 2 || !currentCategoryId || remainingLives === 0) {
       setShowDropdown(false);
       return;
     }
@@ -809,6 +827,32 @@ export default function MultiGameRoom() {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* Points de vie */}
+            {!showResult && isPlaying && (
+              <div className="flex justify-center">
+                <div className="glass rounded-xl px-4 py-2 flex items-center gap-2">
+                  <span className="text-white/60 text-sm font-semibold">Vies :</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map((heart) => (
+                      <span
+                        key={heart}
+                        className={`text-xl transition-all ${
+                          heart <= remainingLives
+                            ? 'opacity-100 scale-100'
+                            : 'opacity-30 scale-75'
+                        }`}
+                      >
+                        {heart <= remainingLives ? '❤️' : '🖤'}
+                      </span>
+                    ))}
+                  </div>
+                  {remainingLives === 0 && (
+                    <span className="text-red-400 text-xs ml-2">(Chat uniquement)</span>
+                  )}
+                </div>
               </div>
             )}
 
