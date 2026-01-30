@@ -89,7 +89,12 @@ export default function MultiGameRoom() {
   // Fonction pour charger les réponses disponibles
   const loadAnswers = async (categoryIds: string[]) => {
     try {
-      const res = await fetch(`/api/answers?categories=${categoryIds.join(',')}`);
+      // Si tableau vide, charger toutes les catégories (room publique)
+      const url = categoryIds.length > 0
+        ? `/api/answers?categories=${categoryIds.join(',')}`
+        : '/api/answers'; // Pas de filtre = toutes les catégories
+
+      const res = await fetch(url);
       if (res.ok) {
         const answers = await res.json();
         setAllAnswers(answers);
@@ -133,8 +138,8 @@ export default function MultiGameRoom() {
           }
           setRoom(state);
 
-          // Charger les réponses disponibles
-          if (state.categories && state.categories.length > 0) {
+          // Charger les réponses disponibles ([] = toutes les catégories pour room publique)
+          if (state.categories !== undefined) {
             loadAnswers(state.categories);
           }
 
@@ -168,8 +173,8 @@ export default function MultiGameRoom() {
             }
             setRoom(state);
 
-            // Charger les réponses disponibles
-            if (state.categories && state.categories.length > 0) {
+            // Charger les réponses disponibles ([] = toutes les catégories pour room publique)
+            if (state.categories !== undefined) {
               loadAnswers(state.categories);
             }
 
