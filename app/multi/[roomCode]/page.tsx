@@ -43,6 +43,7 @@ export default function MultiGameRoom() {
   const [resultTitleVF, setResultTitleVF] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [resultTrackId, setResultTrackId] = useState<number | null>(null);
+  const [previousTrackId, setPreviousTrackId] = useState<number | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
@@ -235,6 +236,7 @@ export default function MultiGameRoom() {
       setResultImage(null);
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
+      setPreviousTrackId(null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -300,8 +302,11 @@ export default function MultiGameRoom() {
     socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string }) => {
       // Arrêter la musique actuelle avant de passer à la suivante
       setIsPlaying(false);
+
+      // Sauvegarder l'ID de la track actuelle avant de changer
       setRoom((prev) => {
         if (!prev) return prev;
+        setPreviousTrackId(prev.currentTrack?.trackId || null);
         return {
           ...prev,
           currentTrackIndex: data.trackIndex,
@@ -331,6 +336,7 @@ export default function MultiGameRoom() {
       setCategoryStats(data.categoryStats || {});
       setIsPlaying(false);
       setShowResult(false);
+      setPreviousTrackId(null);
     });
 
     // Countdown de la room publique
@@ -724,6 +730,7 @@ export default function MultiGameRoom() {
               timeRemaining={timeRemaining}
               totalTime={room.currentTrack?.timeLimit || 30}
               trackId={!showResult ? room.currentTrack?.trackId : undefined}
+              previousTrackId={!showResult ? previousTrackId || undefined : undefined}
             />
 
             {/* Audio */}

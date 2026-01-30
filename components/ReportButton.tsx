@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 
 interface ReportButtonProps {
   trackId: number;
+  label?: string;
 }
 
-export default function ReportButton({ trackId }: ReportButtonProps) {
+export default function ReportButton({ trackId, label }: ReportButtonProps) {
   const [isReported, setIsReported] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -64,7 +65,7 @@ export default function ReportButton({ trackId }: ReportButtonProps) {
       }`}
       title={isReported ? 'Musique signalée' : 'Signaler un problème avec cette musique'}
     >
-      {isLoading ? '...' : isReported ? '✓ Signalé' : '⚠ Signaler'}
+      {isLoading ? '...' : isReported ? '✓ Signalé' : `⚠ ${label || 'Signaler'}`}
     </button>
   );
 }
