@@ -4,6 +4,10 @@ __pycache__
 *.pyc
 .venv
 
+# Fichiers media lourds (montes en volumes via docker-compose, inutile de les embarquer)
+public/audio
+public/images
+
 # Build output
 .next
 

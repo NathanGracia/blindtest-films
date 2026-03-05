@@ -14,6 +14,7 @@ export default function Home() {
   const [roomCode, setRoomCode] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRounds, setSelectedRounds] = useState(25);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -40,6 +41,9 @@ export default function Home() {
         setSelectedRounds(rounds);
       }
     }
+
+    const savedDifficulty = sessionStorage.getItem('blindtest_difficulty');
+    if (savedDifficulty) setSelectedDifficulty(savedDifficulty);
   }, []);
 
   const handleSelectionChange = useCallback((selected: string[]) => {
@@ -73,7 +77,7 @@ export default function Home() {
       setIsLoading(false);
     });
 
-    socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, (code: string | null, errorMsg?: string) => {
+    socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, selectedDifficulty || null, (code: string | null, errorMsg?: string) => {
       if (code) {
         sessionStorage.setItem('blindtest_pseudo', pseudo.trim());
         try { sessionStorage.setItem('blindtest_created_room', code); } catch {}
@@ -200,6 +204,45 @@ export default function Home() {
                 '🌍 Rejoindre la partie publique (🏆classée)'
               )}
             </button>
+          </div>
+
+          {/* Sélecteur de difficulté (rooms privées) */}
+          <div className="mb-4 glass rounded-xl p-4">
+            <label className="block text-[#7ec8e3] text-sm mb-3 font-semibold text-left">
+              Difficulté (partie privée)
+            </label>
+            <div className="flex gap-2">
+              {[
+                { value: '', label: 'Tout' },
+                { value: 'easy', label: 'Facile', color: '#7fba00' },
+                { value: 'medium', label: 'Moyen', color: '#f5a623' },
+                { value: 'hard', label: 'Difficile', color: '#e8445a' },
+              ].map(({ value, label, color }) => (
+                <button
+                  key={value}
+                  onClick={() => {
+                    setSelectedDifficulty(value);
+                    sessionStorage.setItem('blindtest_difficulty', value);
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2 ${
+                    selectedDifficulty === value
+                      ? 'text-white'
+                      : 'text-white/50 border-white/10 hover:border-white/30'
+                  }`}
+                  style={selectedDifficulty === value && color ? {
+                    backgroundColor: `${color}25`,
+                    borderColor: color,
+                    color,
+                  } : selectedDifficulty === value ? {
+                    backgroundColor: 'rgba(126,200,227,0.2)',
+                    borderColor: '#7ec8e3',
+                    color: '#7ec8e3',
+                  } : {}}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Bouton Créer partie privée */}

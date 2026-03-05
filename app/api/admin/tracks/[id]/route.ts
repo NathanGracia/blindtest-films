@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTrackById, updateTrack, deleteTrack, readCategories, resetReportCount } from '@/lib/data';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: Request,
@@ -101,6 +102,16 @@ export async function PATCH(
       }
 
       return NextResponse.json({ success: true, reportCount: 0 });
+    }
+
+    // Définir la difficulté
+    if (body.action === 'set-difficulty') {
+      const { difficulty } = body;
+      const updated = await prisma.track.update({
+        where: { id: parseInt(id, 10) },
+        data: { difficulty },
+      });
+      return NextResponse.json({ success: true, difficulty: updated.difficulty });
     }
 
     return NextResponse.json({ error: 'Action non reconnue' }, { status: 400 });

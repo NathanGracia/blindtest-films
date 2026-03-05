@@ -25,6 +25,7 @@ model Track {
   timeLimit       Int      @default(30)
   startTime       Int      @default(0)  // Seconde de départ de la musique
   reportCount     Int      @default(0) // Nombre de signalements
+  difficulty      String?              // "easy" | "medium" | "hard" | null
   categoryId      String
   category        Category @relation(fields: [categoryId], references: [id])
 }

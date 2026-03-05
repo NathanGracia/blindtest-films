@@ -10,6 +10,13 @@ interface CategoryWithCount extends Category {
 
 type SortField = 'title' | 'category' | 'reports' | 'default';
 type SortDirection = 'asc' | 'desc';
+type DifficultyFilter = '' | 'untagged' | 'easy' | 'medium' | 'hard';
+
+const DIFFICULTY_CONFIG = {
+  easy:   { label: 'Facile',  color: '#7fba00', dot: '🟢' },
+  medium: { label: 'Moyen',   color: '#f5a623', dot: '🟡' },
+  hard:   { label: 'Difficile', color: '#e74c3c', dot: '🔴' },
+} as const;
 
 export default function TracksPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -17,9 +24,11 @@ export default function TracksPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [reloadingCache, setReloadingCache] = useState(false);
 
   // Filtres et recherche
   const [filter, setFilter] = useState<string>('');
+  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Tri
@@ -33,6 +42,25 @@ export default function TracksPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const reloadCache = async () => {
+    setReloadingCache(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/reload-cache', { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`✅ Cache rechargé ! ${data.tracksCount} tracks chargés.`);
+      } else {
+        setError(data.error || 'Erreur lors du rechargement');
+      }
+    } catch (err) {
+      setError('Erreur réseau lors du rechargement du cache');
+    } finally {
+      setReloadingCache(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -93,6 +121,21 @@ export default function TracksPage() {
     }
   };
 
+  const handleSetDifficulty = async (id: number, difficulty: 'easy' | 'medium' | 'hard' | null) => {
+    // Mise à jour optimiste
+    setTracks(tracks.map(t => t.id === id ? { ...t, difficulty } : t));
+    try {
+      await fetch(`/api/admin/tracks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set-difficulty', difficulty }),
+      });
+    } catch {
+      // En cas d'erreur, recharger les données
+      loadData();
+    }
+  };
+
   // Fonction de tri
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -110,6 +153,13 @@ export default function TracksPage() {
     // Filtrer par catégorie
     if (filter) {
       result = result.filter(t => t.categoryId === filter);
+    }
+
+    // Filtrer par difficulté
+    if (difficultyFilter === 'untagged') {
+      result = result.filter(t => !t.difficulty);
+    } else if (difficultyFilter) {
+      result = result.filter(t => t.difficulty === difficultyFilter);
     }
 
     // Recherche par titre
@@ -164,12 +214,12 @@ export default function TracksPage() {
       totalItems: total,
       displayRange: { start: start + 1, end: Math.min(end, total), total }
     };
-  }, [tracks, filter, searchQuery, sortField, sortDirection, currentPage, itemsPerPage, categories]);
+  }, [tracks, filter, difficultyFilter, searchQuery, sortField, sortDirection, currentPage, itemsPerPage, categories]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filter, searchQuery, itemsPerPage]);
+  }, [filter, difficultyFilter, searchQuery, itemsPerPage]);
 
   if (loading) {
     return (
@@ -210,6 +260,14 @@ export default function TracksPage() {
               className="w-full px-4 py-2 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/10 focus:border-[#7ec8e3] focus:outline-none transition-colors"
             />
           </div>
+          <button
+            onClick={reloadCache}
+            disabled={reloadingCache}
+            className="px-4 py-2 rounded-lg bg-[#7fba00] text-white font-semibold hover:bg-[#6fa000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            title="Le serveur garde tous les tracks en mémoire pour vérifier les réponses (système de vies). Ce cache est chargé au démarrage — cliquez ici pour le mettre à jour après avoir ajouté des tracks, sans avoir à redémarrer le serveur."
+          >
+            {reloadingCache ? '⏳ Rechargement...' : '🔄 Recharger cache'}
+          </button>
           <select
             value={itemsPerPage}
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
@@ -248,6 +306,33 @@ export default function TracksPage() {
             </button>
           ))}
         </div>
+
+        {/* Filtres difficulté */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-white/60 text-sm">Difficulté :</span>
+          {([
+            { value: '', label: 'Toutes' },
+            { value: 'untagged', label: 'Non taggué' },
+            { value: 'easy', label: 'Facile', color: '#7fba00' },
+            { value: 'medium', label: 'Moyen', color: '#f5a623' },
+            { value: 'hard', label: 'Difficile', color: '#e74c3c' },
+          ] as const).map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setDifficultyFilter(opt.value as DifficultyFilter)}
+              className={`px-3 py-1 rounded-lg text-sm transition-all ${
+                difficultyFilter === opt.value ? 'text-white' : 'text-white/60 hover:text-white'
+              }`}
+              style={{
+                backgroundColor: difficultyFilter === opt.value
+                  ? ('color' in opt ? opt.color : '#4a90d9')
+                  : 'transparent',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -263,11 +348,12 @@ export default function TracksPage() {
             <span className="text-white/60">
               Affichage de {displayRange.start} à {displayRange.end} sur {displayRange.total} résultat{displayRange.total > 1 ? 's' : ''}
             </span>
-            {(searchQuery || filter) && (
+            {(searchQuery || filter || difficultyFilter) && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setFilter('');
+                  setDifficultyFilter('');
                 }}
                 className="text-[#7ec8e3] hover:text-white transition-colors"
               >
@@ -325,6 +411,7 @@ export default function TracksPage() {
                 </th>
                 <th className="text-left p-4 text-white/60 font-medium">Audio</th>
                 <th className="text-left p-4 text-white/60 font-medium">Image</th>
+                <th className="text-left p-4 text-white/60 font-medium">Difficulté</th>
                 <th
                   onClick={() => handleSort('reports')}
                   className="text-left p-4 text-white/60 font-medium cursor-pointer hover:text-white transition-colors select-none"
@@ -386,6 +473,28 @@ export default function TracksPage() {
                       ) : (
                         <span className="text-white/40">—</span>
                       )}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-1">
+                        {(['easy', 'medium', 'hard'] as const).map((d) => {
+                          const cfg = DIFFICULTY_CONFIG[d];
+                          const isActive = track.difficulty === d;
+                          return (
+                            <button
+                              key={d}
+                              onClick={() => handleSetDifficulty(track.id, isActive ? null : d)}
+                              title={cfg.label}
+                              className="w-7 h-7 rounded text-sm transition-all"
+                              style={{
+                                opacity: isActive ? 1 : 0.3,
+                                backgroundColor: isActive ? `${cfg.color}30` : 'transparent',
+                              }}
+                            >
+                              {cfg.dot}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">

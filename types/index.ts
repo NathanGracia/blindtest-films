@@ -18,6 +18,7 @@ export interface Track {
   timeLimit: number;
   startTime: number; // Seconde de départ de la musique
   reportCount?: number; // Nombre de signalements
+  difficulty?: 'easy' | 'medium' | 'hard' | null;
 }
 
 // Alias pour compatibilité (à supprimer progressivement)

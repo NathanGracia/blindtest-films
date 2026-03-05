@@ -11,7 +11,6 @@ interface LadderEntry {
 
 export default function LadderSidebar() {
   const [entries, setEntries] = useState<LadderEntry[]>([]);
-  const [weekId, setWeekId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -20,7 +19,6 @@ export default function LadderSidebar() {
         const res = await fetch('/api/ladder');
         const data = await res.json();
         setEntries(data.entries || []);
-        setWeekId(data.weekId || '');
       } catch (error) {
         console.error('Erreur chargement ladder:', error);
       } finally {
@@ -46,14 +44,14 @@ export default function LadderSidebar() {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[#7ec8e3] font-bold text-lg flex items-center gap-2">
           <span className="text-2xl">🏆</span>
-          Ladder Hebdomadaire
+          Meilleurs scores
         </h3>
       </div>
 
 
       {entries.length === 0 ? (
         <div className="text-white/40 text-sm text-center py-8">
-          Aucun score cette semaine.<br/>Sois le premier !
+          Aucun score pour l'instant.<br/>Sois le premier !
         </div>
       ) : (
         <div className="space-y-2">
@@ -98,7 +96,7 @@ export default function LadderSidebar() {
       )}
 
       <div className="mt-4 pt-4 border-t border-white/10 text-white/40 text-xs text-center">
-        Reset dimanche 23:59
+        Classement général
       </div>
     </div>
   );

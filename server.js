@@ -32,7 +32,7 @@ async function saveLadderScore(pseudo, score) {
   if (!pseudo || score <= 0) return;
 
   const normalizedPseudo = pseudo.trim().toLowerCase();
-  const weekId = getWeekId();
+  const weekId = 'all-time';
 
   try {
     const existing = await prisma.ladderEntry.findUnique({
@@ -159,18 +159,8 @@ async function createPublicRoom() {
   try {
     const allTracks = await loadTracks();
 
-    // Grouper par catégorie
-    const tracksPerCategory = {};
-    for (const track of allTracks) {
-      if (!tracksPerCategory[track.categoryId]) {
-        tracksPerCategory[track.categoryId] = [];
-      }
-      tracksPerCategory[track.categoryId].push(track);
-    }
-
-    // Distribution équitable entre toutes les catégories disponibles
-    const allCategories = Object.keys(tracksPerCategory);
-    const limitedTracks = distributeTracksEquitably(allCategories, 25, tracksPerCategory);
+    // Distribution avec répartition par difficulté
+    const limitedTracks = distributeTracksWithDifficulty(allTracks, 25);
 
     const publicRoom = {
       code: PUBLIC_ROOM_CODE,
@@ -301,6 +291,79 @@ function distributeTracksEquitably(categories, totalRounds, tracksPerCategory) {
   return shuffled;
 }
 
+// Distribuer les tracks avec répartition par difficulté (40% easy, 40% medium, 20% hard)
+function distributeTracksWithDifficulty(allTracks, totalRounds) {
+  const DIFFICULTY_RATIOS = { easy: 0.40, medium: 0.40, hard: 0.20 };
+
+  // Séparer par difficulté
+  const buckets = { easy: [], medium: [], hard: [], untagged: [] };
+  for (const track of allTracks) {
+    const key = track.difficulty || 'untagged';
+    buckets[key].push(track);
+  }
+
+  // Catégories disponibles (pour l'équité inter-catégories)
+  const allCategories = [...new Set(allTracks.map(t => t.categoryId))];
+
+  function groupByCategory(tracks) {
+    const map = {};
+    for (const track of tracks) {
+      if (!map[track.categoryId]) map[track.categoryId] = [];
+      map[track.categoryId].push(track);
+    }
+    return map;
+  }
+
+  const result = [];
+  let untaggedPool = shuffleArray([...buckets.untagged]);
+
+  for (const [difficulty, ratio] of Object.entries(DIFFICULTY_RATIOS)) {
+    const target = Math.round(totalRounds * ratio);
+    const available = buckets[difficulty];
+
+    // Distribuer équitablement dans ce bucket
+    const perCategory = groupByCategory(available);
+    const cats = allCategories.filter(c => perCategory[c]?.length > 0);
+
+    let selected = cats.length > 0
+      ? distributeTracksEquitably(cats, Math.min(target, available.length), perCategory)
+      : [];
+
+    // Fallback : combler le manque avec les untagged
+    const shortfall = target - selected.length;
+    if (shortfall > 0 && untaggedPool.length > 0) {
+      const untaggedPerCat = groupByCategory(untaggedPool);
+      const untaggedCats = allCategories.filter(c => untaggedPerCat[c]?.length > 0);
+      const extra = untaggedCats.length > 0
+        ? distributeTracksEquitably(untaggedCats, Math.min(shortfall, untaggedPool.length), untaggedPerCat)
+        : [];
+
+      selected.push(...extra);
+      const usedIds = new Set(extra.map(t => t.id));
+      untaggedPool = untaggedPool.filter(t => !usedIds.has(t.id));
+    }
+
+    result.push(...selected);
+  }
+
+  // Compléter si on est encore en dessous du total
+  const usedIds = new Set(result.map(t => t.id));
+  if (result.length < totalRounds) {
+    const remaining = allTracks.filter(t => !usedIds.has(t.id));
+    const perCat = groupByCategory(remaining);
+    const cats = [...new Set(remaining.map(t => t.categoryId))];
+    const extra = distributeTracksEquitably(cats, totalRounds - result.length, perCat);
+    result.push(...extra);
+  }
+
+  console.log('[DIFFICULTY]', result.reduce((acc, t) => {
+    acc[t.difficulty || 'untagged'] = (acc[t.difficulty || 'untagged'] || 0) + 1;
+    return acc;
+  }, {}));
+
+  return shuffleArray(result);
+}
+
 // Filtrer les tracks par catégories
 function filterTracksByCategories(tracks, categoryIds) {
   if (!categoryIds || categoryIds.length === 0) {
@@ -351,18 +414,8 @@ async function startPublicGame(room) {
   try {
     const allTracks = await loadTracks();
 
-    // Grouper par catégorie
-    const tracksPerCategory = {};
-    for (const track of allTracks) {
-      if (!tracksPerCategory[track.categoryId]) {
-        tracksPerCategory[track.categoryId] = [];
-      }
-      tracksPerCategory[track.categoryId].push(track);
-    }
-
-    // Distribution équitable entre toutes les catégories
-    const allCategories = Object.keys(tracksPerCategory);
-    room.tracks = distributeTracksEquitably(allCategories, 25, tracksPerCategory);
+    // Distribution avec répartition par difficulté
+    room.tracks = distributeTracksWithDifficulty(allTracks, 25);
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
@@ -385,6 +438,7 @@ async function startPublicGame(room) {
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
       categoryId: currentTrack.categoryId,
+      difficulty: currentTrack.difficulty || null,
     });
 
     // Démarrer le timer
@@ -508,6 +562,7 @@ async function nextTrackPublic(room) {
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
       categoryId: currentTrack.categoryId,
+      difficulty: currentTrack.difficulty || null,
     });
   }
 
@@ -521,8 +576,29 @@ app.prepare().then(async () => {
   // Charger le cache de tous les tracks pour vérification des suggestions
   allTracksCache = await loadTracks();
   console.log(`[CACHE] ${allTracksCache.length} tracks chargés en cache`);
+
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
+
+    // Endpoint interne pour recharger le cache
+    if (req.url === '/internal/reload-cache' && req.method === 'POST') {
+      loadTracks().then(tracks => {
+        allTracksCache = tracks;
+        console.log(`[CACHE] Cache rechargé: ${allTracksCache.length} tracks`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          tracksCount: allTracksCache.length,
+        }));
+      }).catch(err => {
+        console.error('[CACHE] Erreur rechargement:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to reload cache' }));
+      });
+      return;
+    }
+
     handle(req, res, parsedUrl);
   });
 
@@ -536,16 +612,22 @@ app.prepare().then(async () => {
     let currentPseudo = null;
 
     // Créer une room
-    socket.on('room:create', async (pseudo, categories, maxRounds, callback) => {
+    socket.on('room:create', async (pseudo, categories, maxRounds, difficulty, callback) => {
       // Backward compatibility
+      if (typeof difficulty === 'function') {
+        callback = difficulty;
+        difficulty = null;
+      }
       if (typeof maxRounds === 'function') {
         callback = maxRounds;
         maxRounds = null;
+        difficulty = null;
       }
       if (typeof categories === 'function') {
         callback = categories;
         categories = null;
         maxRounds = null;
+        difficulty = null;
       }
 
       // Vérifier que callback est une fonction
@@ -560,12 +642,15 @@ app.prepare().then(async () => {
           code = generateRoomCode();
         }
 
-        // Charger et filtrer les tracks
+        // Charger et filtrer les tracks par catégorie puis par difficulté
         const allTracks = await loadTracks();
-        const filteredTracks = filterTracksByCategories(allTracks, categories);
+        let filteredTracks = filterTracksByCategories(allTracks, categories);
+        if (difficulty) {
+          filteredTracks = filteredTracks.filter(t => t.difficulty === difficulty);
+        }
 
         if (filteredTracks.length === 0) {
-          callback(null, 'Aucune musique disponible pour les catégories sélectionnées');
+          callback(null, 'Aucune musique disponible pour les catégories et la difficulté sélectionnées');
           return;
         }
 
@@ -604,6 +689,7 @@ app.prepare().then(async () => {
           tracks: finalTracks,
           categories: categories || [],
           maxRounds: maxRounds || null,
+          difficulty: difficulty || null,
           timer: null,
           timeRemaining: 30,
           roundFinders: new Set(),
@@ -727,7 +813,10 @@ app.prepare().then(async () => {
       try {
         // Recharger et refiltrer les tracks
         const allTracks = await loadTracks();
-        const filteredTracks = filterTracksByCategories(allTracks, room.categories);
+        let filteredTracks = filterTracksByCategories(allTracks, room.categories);
+        if (room.difficulty) {
+          filteredTracks = filteredTracks.filter(t => t.difficulty === room.difficulty);
+        }
 
         // Respecter maxRounds si défini
         let finalTracks = filteredTracks;
@@ -778,6 +867,7 @@ app.prepare().then(async () => {
           startTime: currentTrack.startTime || 0,
           totalTracks: room.tracks.length,
           categoryId: currentTrack.categoryId,
+          difficulty: currentTrack.difficulty || null,
         });
 
         // Démarrer le timer
@@ -1093,6 +1183,7 @@ app.prepare().then(async () => {
       startTime: currentTrack.startTime || 0,
       totalTracks: room.tracks.length,
       categoryId: currentTrack.categoryId,
+      difficulty: currentTrack.difficulty || null,
     });
 
     startTimer(room, roomCode, io);

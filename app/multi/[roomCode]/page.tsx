@@ -53,6 +53,7 @@ export default function MultiGameRoom() {
   const [volume, setVolume] = useState(0.7);
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
+  const [currentDifficulty, setCurrentDifficulty] = useState<string | null>(null);
   const [allAnswers, setAllAnswers] = useState<TrackSuggestion[]>([]);
   const [filteredSuggestions, setFilteredSuggestions] = useState<TrackSuggestion[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -217,7 +218,7 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:start', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string }) => {
+    socket.on('game:start', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string; difficulty?: string | null }) => {
       setRoom((prev) => {
         if (!prev) return prev;
         return {
@@ -236,6 +237,7 @@ export default function MultiGameRoom() {
       setResultImage(null);
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
+      setCurrentDifficulty(data.difficulty || null);
       setPreviousTrackId(null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
@@ -299,7 +301,7 @@ export default function MultiGameRoom() {
       });
     });
 
-    socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string }) => {
+    socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string; difficulty?: string | null }) => {
       // Arrêter la musique actuelle avant de passer à la suivante
       setIsPlaying(false);
 
@@ -321,6 +323,7 @@ export default function MultiGameRoom() {
       setResultTrackId(null);
       setIsPlaying(true);
       setCurrentCategoryId(data.categoryId || null);
+      setCurrentDifficulty(data.difficulty || null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -815,9 +818,9 @@ export default function MultiGameRoom() {
               </div>
             )}
 
-            {/* Catégorie */}
+            {/* Catégorie + Difficulté */}
             {currentCategoryId && !showResult && (
-              <div className="flex justify-center">
+              <div className="flex justify-center items-center gap-2">
                 {(() => {
                   const category = categories.find((c) => c.id === currentCategoryId);
                   if (!category) return null;
@@ -831,6 +834,23 @@ export default function MultiGameRoom() {
                         {icon}
                       </span>
                       <span className="text-white font-semibold">{category.name}</span>
+                    </div>
+                  );
+                })()}
+                {currentDifficulty && (() => {
+                  const config: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                    easy:   { label: 'Facile',   color: '#7fba00', bg: 'rgba(127,186,0,0.15)',   border: 'rgba(127,186,0,0.5)' },
+                    medium: { label: 'Moyen',    color: '#f5a623', bg: 'rgba(245,166,35,0.15)',  border: 'rgba(245,166,35,0.5)' },
+                    hard:   { label: 'Difficile', color: '#e8445a', bg: 'rgba(232,68,90,0.15)',   border: 'rgba(232,68,90,0.5)' },
+                  };
+                  const d = config[currentDifficulty];
+                  if (!d) return null;
+                  return (
+                    <div
+                      className="glass rounded-xl px-3 py-2 flex items-center gap-1.5"
+                      style={{ backgroundColor: d.bg, borderColor: d.border, borderWidth: '2px' }}
+                    >
+                      <span style={{ color: d.color }} className="text-sm font-bold">{d.label}</span>
                     </div>
                   );
                 })()}

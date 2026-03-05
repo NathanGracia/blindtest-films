@@ -14,10 +14,12 @@ function toTrack(dbTrack: {
   timeLimit: number;
   startTime: number;
   reportCount: number;
+  difficulty: string | null;
 }): Track {
   return {
     ...dbTrack,
     acceptedAnswers: JSON.parse(dbTrack.acceptedAnswers),
+    difficulty: dbTrack.difficulty as 'easy' | 'medium' | 'hard' | null,
   };
 }
 
@@ -81,6 +83,7 @@ export async function updateTrack(id: number, updates: Partial<Track>): Promise<
     if (updates.categoryId !== undefined) data.categoryId = updates.categoryId;
     if (updates.timeLimit !== undefined) data.timeLimit = updates.timeLimit;
     if (updates.startTime !== undefined) data.startTime = updates.startTime;
+    if (updates.difficulty !== undefined) data.difficulty = updates.difficulty;
 
     const track = await prisma.track.update({
       where: { id },
