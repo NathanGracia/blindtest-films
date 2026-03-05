@@ -10,6 +10,7 @@ import PlayerList from '@/components/PlayerList';
 import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
+import DeterminossNotif from '@/components/DeterminossNotif';
 import { Player, ChatMessage, RoomState, Category } from '@/types';
 
 interface TrackSuggestion {
@@ -703,6 +704,8 @@ export default function MultiGameRoom() {
     <div className="min-h-screen aero-bg p-4">
       {/* Slider de volume */}
       <VolumeSlider onVolumeChange={setVolume} />
+      {/* Notification Determinoss */}
+      <DeterminossNotif />
 
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}

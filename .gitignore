@@ -170,5 +170,8 @@ dmypy.json
 # Import script logs
 scripts/import_errors.log
 scripts/*.log
+
+# Determinoss token
+token.txt
 nul
 public/audio/

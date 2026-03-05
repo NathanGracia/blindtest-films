@@ -2,6 +2,8 @@ require('dotenv').config();
 
 const { createServer } = require('http');
 const { parse } = require('url');
+const path = require('path');
+const fs = require('fs');
 const next = require('next');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
@@ -231,11 +233,40 @@ function calculateScore(timeRemaining, timeLimit, isFirstFinder) {
   return score;
 }
 
-// Mélanger un tableau
+// Determinoss : seed depuis la lampe à lave
+let currentRNG = Math.random;
+
+function seededRNG(hexSeed) {
+  let seed = parseInt(hexSeed.slice(0, 8), 16);
+  return () => {
+    seed += 0x6D2B79F5;
+    let t = seed;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+async function refreshDeternossSeed() {
+  try {
+    const token = fs.readFileSync(path.join(__dirname, 'token.txt'), 'utf8').trim();
+    const res = await fetch(`https://determinoss.nathangracia.com/seed?token=${encodeURIComponent(token)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.seed) {
+      currentRNG = seededRNG(data.seed);
+      console.log(`[DETERMINOSS] Seed refreshed: ${data.seed.slice(0, 8)}... (age: ${data.age_ms}ms)`);
+    }
+  } catch (err) {
+    console.warn('[DETERMINOSS] Failed to fetch seed, using Math.random:', err.message);
+  }
+}
+
+// Mélanger un tableau (utilise le RNG seedé par la lampe à lave si disponible)
 function shuffleArray(array) {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(currentRNG() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
@@ -570,6 +601,10 @@ async function nextTrackPublic(room) {
 }
 
 app.prepare().then(async () => {
+  // Charger le seed Determinoss (lampe à lave) au démarrage
+  await refreshDeternossSeed();
+  setInterval(refreshDeternossSeed, 60_000);
+
   // Créer la room publique au démarrage
   await createPublicRoom();
 
