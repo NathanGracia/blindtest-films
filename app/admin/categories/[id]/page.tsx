@@ -32,6 +32,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('film');
   const [color, setColor] = useState('#4a90d9');
+  const [rankedEnabled, setRankedEnabled] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
           setName(data.name);
           setIcon(data.icon);
           setColor(data.color);
+          setRankedEnabled(data.rankedEnabled ?? true);
         } else {
           setError('Catégorie non trouvée');
         }
@@ -68,7 +70,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
       const res = await fetch(`/api/admin/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, icon, color }),
+        body: JSON.stringify({ name, icon, color, rankedEnabled }),
       });
 
       if (res.ok) {
@@ -190,6 +192,22 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
               />
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold">
+            Incluse dans les ranked
+          </label>
+          <button
+            type="button"
+            onClick={() => setRankedEnabled(!rankedEnabled)}
+            className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${rankedEnabled ? 'bg-green-500' : 'bg-white/20'}`}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${rankedEnabled ? 'translate-x-8' : 'translate-x-1'}`} />
+          </button>
+          <p className="text-white/40 text-xs mt-1">
+            {rankedEnabled ? 'Activée — apparaît dans les parties ranked' : 'Désactivée — exclue des parties ranked'}
+          </p>
         </div>
 
         <div className="flex gap-3 pt-4">

@@ -4,6 +4,7 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
+  rankedEnabled: boolean;
 }
 
 // Types pour les musiques (anciennement Film)

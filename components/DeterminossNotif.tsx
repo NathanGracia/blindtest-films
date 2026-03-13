@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-export default function DeterminossNotif() {
+interface Props {
+  gameStartKey: number;
+}
+
+export default function DeterminossNotif({ gameStartKey }: Props) {
   const [frameJpeg, setFrameJpeg] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchFrame = async () => {
     try {
@@ -20,7 +26,18 @@ export default function DeterminossNotif() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!frameJpeg) return null;
+  // Afficher 5s au début de chaque game
+  useEffect(() => {
+    if (gameStartKey === 0) return;
+    setVisible(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setVisible(false), 5000);
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [gameStartKey]);
+
+  if (!frameJpeg || !visible) return null;
 
   return (
     <a
@@ -28,15 +45,16 @@ export default function DeterminossNotif() {
       target="_blank"
       rel="noopener noreferrer"
       className="fixed bottom-4 right-4 z-50 block group"
+      onClick={() => setVisible(false)}
     >
       <div className="glass rounded-xl overflow-hidden border-2 border-white/20 group-hover:border-[#7ec8e3]/60 transition-all group-hover:scale-105 shadow-lg">
-        <div className="px-3 py-1.5 text-xs text-white/50 text-center border-b border-white/10 group-hover:text-white/70 transition-colors">
+        <div className="px-3 py-2 text-sm text-white/60 text-center border-b border-white/10 group-hover:text-white/80 transition-colors font-medium">
           Seedé par Determinoss
         </div>
         <img
           src={`data:image/jpeg;base64,${frameJpeg}`}
           alt="Lava lamp live"
-          className="block w-48"
+          className="block w-64"
         />
       </div>
     </a>

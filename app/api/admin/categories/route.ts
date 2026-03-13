@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, icon, color } = body;
+    const { id, name, icon, color, rankedEnabled } = body;
 
     if (!id || !name) {
       return NextResponse.json({ error: 'ID et nom requis' }, { status: 400 });
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       name,
       icon: icon || 'music',
       color: color || '#4a90d9',
+      rankedEnabled: rankedEnabled !== false,
     });
 
     return NextResponse.json(category, { status: 201 });

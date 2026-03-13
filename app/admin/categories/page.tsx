@@ -98,6 +98,7 @@ export default function CategoriesPage() {
                 <th className="text-left p-4 text-white/60 font-medium">ID</th>
                 <th className="text-left p-4 text-white/60 font-medium">Icône</th>
                 <th className="text-left p-4 text-white/60 font-medium">Musiques</th>
+                <th className="text-left p-4 text-white/60 font-medium">Ranked</th>
                 <th className="text-right p-4 text-white/60 font-medium">Actions</th>
               </tr>
             </thead>
@@ -116,6 +117,11 @@ export default function CategoriesPage() {
                   <td className="p-4 text-white/60 font-mono text-sm">{category.id}</td>
                   <td className="p-4 text-white/60">{category.icon}</td>
                   <td className="p-4 text-white/60">{category.trackCount}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${category.rankedEnabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      {category.rankedEnabled ? 'Oui' : 'Non'}
+                    </span>
+                  </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link

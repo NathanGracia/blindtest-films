@@ -27,9 +27,9 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, icon, color } = body;
+    const { name, icon, color, rankedEnabled } = body;
 
-    const updated = await updateCategory(id, { name, icon, color });
+    const updated = await updateCategory(id, { name, icon, color, rankedEnabled });
 
     if (!updated) {
       return NextResponse.json({ error: 'Catégorie non trouvée' }, { status: 404 });

@@ -69,6 +69,7 @@ export default function MultiGameRoom() {
 
   // Système de points de vie
   const [remainingLives, setRemainingLives] = useState(3);
+  const [gameStartKey, setGameStartKey] = useState(0);
 
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
@@ -235,6 +236,7 @@ export default function MultiGameRoom() {
       setShowResult(false);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
+      if (data.trackIndex === 0) setGameStartKey((k) => k + 1);
       setResultImage(null);
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
@@ -705,7 +707,7 @@ export default function MultiGameRoom() {
       {/* Slider de volume */}
       <VolumeSlider onVolumeChange={setVolume} />
       {/* Notification Determinoss */}
-      <DeterminossNotif />
+      <DeterminossNotif gameStartKey={gameStartKey} />
 
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}

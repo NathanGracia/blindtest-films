@@ -8,11 +8,12 @@ datasource db {
 }
 
 model Category {
-  id     String  @id
-  name   String
-  icon   String
-  color  String
-  tracks Track[]
+  id            String  @id
+  name          String
+  icon          String
+  color         String
+  rankedEnabled Boolean @default(true)
+  tracks        Track[]
 }
 
 model Track {
