@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Category } from '@/types';
 import FileUpload from '@/components/admin/FileUpload';
+import YoutubeDownload from '@/components/admin/YoutubeDownload';
 import SelectListbox from '@/components/SelectListbox';
 import TagInput from '@/components/admin/TagInput';
 
@@ -21,6 +22,7 @@ export default function NewTrackPage() {
   const [startTime, setStartTime] = useState(0);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [audioTab, setAudioTab] = useState<'upload' | 'youtube'>('upload');
 
   // Audio preview
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -252,12 +254,34 @@ export default function NewTrackPage() {
         </div>
 
         <div className="glass rounded-xl p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-white">Fichier audio *</h3>
-          <FileUpload
-            type="audio"
-            currentFile={audioFile}
-            onUpload={setAudioFile}
-          />
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Fichier audio *</h3>
+            <div className="flex rounded-lg overflow-hidden border border-white/20 text-sm">
+              <button
+                type="button"
+                onClick={() => setAudioTab('upload')}
+                className={`px-3 py-1.5 transition-colors ${audioTab === 'upload' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'}`}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudioTab('youtube')}
+                className={`px-3 py-1.5 transition-colors ${audioTab === 'youtube' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'}`}
+              >
+                URL YouTube
+              </button>
+            </div>
+          </div>
+          {audioTab === 'upload' ? (
+            <FileUpload
+              type="audio"
+              currentFile={audioFile}
+              onUpload={setAudioFile}
+            />
+          ) : (
+            <YoutubeDownload onDownload={(path) => { setAudioFile(path); setAudioTab('upload'); }} />
+          )}
 
           {/* Preview audio avec startTime */}
           {audioFile && (

@@ -15,7 +15,7 @@ export default function VolumeSlider({ onVolumeChange }: VolumeSliderProps) {
 
   // Charger le volume depuis localStorage au montage
   useEffect(() => {
-    const savedVolume = localStorage.getItem('blindtest_volume');
+    const savedVolume = localStorage.getItem('blindtoss_volume');
     if (savedVolume !== null) {
       const vol = parseFloat(savedVolume);
       if (!isNaN(vol) && vol >= 0 && vol <= 1) {
@@ -30,7 +30,7 @@ export default function VolumeSlider({ onVolumeChange }: VolumeSliderProps) {
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
-    localStorage.setItem('blindtest_volume', newVolume.toString());
+    localStorage.setItem('blindtoss_volume', newVolume.toString());
     onVolumeChange(newVolume);
   };
 

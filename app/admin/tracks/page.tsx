@@ -237,7 +237,7 @@ export default function TracksPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Musiques</h2>
-          <p className="text-white/60">Gérez les musiques du blindtest</p>
+          <p className="text-white/60">Gérez les musiques du BlindToss</p>
         </div>
         <Link
           href="/admin/tracks/new"

@@ -13,17 +13,25 @@ export async function POST(
       return NextResponse.json({ error: 'ID invalide' }, { status: 400 });
     }
 
-    // Vérifier que le track existe
     const track = await getTrackById(trackId);
     if (!track) {
       return NextResponse.json({ error: 'Musique introuvable' }, { status: 404 });
     }
 
-    // Incrémenter le compteur de signalements
+    let message = '';
+    try {
+      const body = await request.json();
+      message = typeof body.message === 'string' ? body.message.slice(0, 200) : '';
+    } catch {
+      // Pas de body JSON
+    }
+
     const success = await reportTrack(trackId);
     if (!success) {
       return NextResponse.json({ error: 'Erreur lors du signalement' }, { status: 500 });
     }
+
+    console.log(`[REPORT] Track ${trackId} "${track.title}"${message ? ` : ${message}` : ''}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
-const SESSION_COOKIE = 'blindtest_admin_session';
+const SESSION_COOKIE = 'blindtoss_admin_session';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 heures
 
 // Génère un hash du token de session
@@ -9,7 +9,7 @@ function generateSessionToken(password: string): string {
   const secret = process.env.ADMIN_PASSWORD || '';
   return crypto
     .createHash('sha256')
-    .update(password + secret + 'blindtest-salt')
+    .update(password + secret + 'blindtoss-salt')
     .digest('hex');
 }
 

@@ -122,7 +122,7 @@ export default function MultiGameRoom() {
 
     // Try to rejoin the room if we have a stored pseudo (handles reconnects / navigation)
     const storedPseudo = (() => {
-      try { return sessionStorage.getItem('blindtest_pseudo'); } catch { return null; }
+      try { return sessionStorage.getItem('blindtoss_pseudo'); } catch { return null; }
     })();
 
     if (!storedPseudo) {
@@ -131,11 +131,11 @@ export default function MultiGameRoom() {
     } else {
       // If this client just created the room, skip the explicit join (server already added the creator)
       const justCreatedRoom = (() => {
-        try { return sessionStorage.getItem('blindtest_created_room'); } catch { return null; }
+        try { return sessionStorage.getItem('blindtoss_created_room'); } catch { return null; }
       })();
 
       if (justCreatedRoom === roomCode) {
-        try { sessionStorage.removeItem('blindtest_created_room'); } catch {}
+        try { sessionStorage.removeItem('blindtoss_created_room'); } catch {}
 
         // Request the room state directly
         socket.emit('room:state', (state: RoomState | null) => {
@@ -170,7 +170,7 @@ export default function MultiGameRoom() {
           }
 
           // Persist final pseudo (server may have modified it)
-          try { sessionStorage.setItem('blindtest_pseudo', finalPseudo || storedPseudo); } catch {}
+          try { sessionStorage.setItem('blindtoss_pseudo', finalPseudo || storedPseudo); } catch {}
 
           // Now request the room state
           socket.emit('room:state', (state: RoomState | null) => {
@@ -416,7 +416,7 @@ export default function MultiGameRoom() {
   const handleLeave = () => {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
     socketRef.current.emit('room:leave');
-    try { sessionStorage.removeItem('blindtest_pseudo'); } catch {}
+    try { sessionStorage.removeItem('blindtoss_pseudo'); } catch {}
     router.push('/');
   };
 

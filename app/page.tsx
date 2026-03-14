@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import CategorySelector from '@/components/CategorySelector';
 import LadderSidebar from '@/components/LadderSidebar';
+import UpdatesSidebar from '@/components/UpdatesSidebar';
 import { getSocket } from '@/lib/socket';
 
 export default function Home() {
@@ -20,12 +21,12 @@ export default function Home() {
 
   // Charger la sélection sauvegardée
   useEffect(() => {
-    const savedPseudo = sessionStorage.getItem('blindtest_pseudo');
+    const savedPseudo = sessionStorage.getItem('blindtoss_pseudo');
     if (savedPseudo) {
       setPseudo(savedPseudo);
     }
 
-    const saved = sessionStorage.getItem('blindtest_categories');
+    const saved = sessionStorage.getItem('blindtoss_categories');
     if (saved) {
       try {
         setSelectedCategories(JSON.parse(saved));
@@ -34,7 +35,7 @@ export default function Home() {
       }
     }
 
-    const savedRounds = sessionStorage.getItem('blindtest_rounds');
+    const savedRounds = sessionStorage.getItem('blindtoss_rounds');
     if (savedRounds) {
       const rounds = parseInt(savedRounds, 10);
       if (!isNaN(rounds)) {
@@ -42,18 +43,18 @@ export default function Home() {
       }
     }
 
-    const savedDifficulty = sessionStorage.getItem('blindtest_difficulty');
+    const savedDifficulty = sessionStorage.getItem('blindtoss_difficulty');
     if (savedDifficulty) setSelectedDifficulty(savedDifficulty);
   }, []);
 
   const handleSelectionChange = useCallback((selected: string[]) => {
     setSelectedCategories(selected);
-    sessionStorage.setItem('blindtest_categories', JSON.stringify(selected));
+    sessionStorage.setItem('blindtoss_categories', JSON.stringify(selected));
   }, []);
 
   const handleRoundsChange = useCallback((rounds: number) => {
     setSelectedRounds(rounds);
-    sessionStorage.setItem('blindtest_rounds', rounds.toString());
+    sessionStorage.setItem('blindtoss_rounds', rounds.toString());
   }, []);
 
   const handleCreatePrivate = () => {
@@ -79,8 +80,8 @@ export default function Home() {
 
     socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, selectedDifficulty || null, (code: string | null, errorMsg?: string) => {
       if (code) {
-        sessionStorage.setItem('blindtest_pseudo', pseudo.trim());
-        try { sessionStorage.setItem('blindtest_created_room', code); } catch {}
+        sessionStorage.setItem('blindtoss_pseudo', pseudo.trim());
+        try { sessionStorage.setItem('blindtoss_created_room', code); } catch {}
         router.push(`/multi/${code}`);
       } else {
         setError(errorMsg || 'Erreur lors de la création de la room');
@@ -101,7 +102,7 @@ export default function Home() {
     const socket = getSocket();
     socket.emit('room:join', 'PUBLIC', pseudo.trim(), (success: boolean, errorMsg?: string, finalPseudo?: string) => {
       if (success) {
-        sessionStorage.setItem('blindtest_pseudo', finalPseudo || pseudo.trim());
+        sessionStorage.setItem('blindtoss_pseudo', finalPseudo || pseudo.trim());
         router.push('/multi/PUBLIC');
       } else {
         setError(errorMsg || 'Impossible de rejoindre la partie publique');
@@ -127,7 +128,7 @@ export default function Home() {
     const socket = getSocket();
     socket.emit('room:join', roomCode.trim().toUpperCase(), pseudo.trim(), (success: boolean, errorMsg?: string, finalPseudo?: string) => {
       if (success) {
-        sessionStorage.setItem('blindtest_pseudo', finalPseudo || pseudo.trim());
+        sessionStorage.setItem('blindtoss_pseudo', finalPseudo || pseudo.trim());
         router.push(`/multi/${roomCode.trim().toUpperCase()}`);
       } else {
         setError(errorMsg || 'Impossible de rejoindre');
@@ -139,18 +140,20 @@ export default function Home() {
   return (
     <div className="min-h-screen aero-bg flex flex-col">
       <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center p-4 gap-8">
-        {/* Espace vide gauche */}
-        <div className="hidden lg:block"></div>
+        {/* Sidebar Nouveautés - centré dans l'espace de gauche */}
+        <div className="hidden lg:flex justify-center">
+          <UpdatesSidebar />
+        </div>
 
         {/* Contenu principal centré */}
         <div className="text-center max-w-lg w-full col-start-2 lg:col-start-auto">
           {/* Logo / Title */}
           <div className="mb-8">
             <div className="w-28 h-28 mx-auto mb-5 flex items-center justify-center">
-              <Image src="/logo.png" alt="Blindtest" width={112} height={112} className="drop-shadow-lg" />
+              <Image src="/logo.png" alt="BlindToss" width={112} height={112} className="drop-shadow-lg" />
             </div>
             <h1 className="text-5xl font-bold text-white mb-3 text-glow tracking-wide">
-              BlindTest
+              BlindToss
             </h1>
             <p className="text-white/60 text-lg">
               Reconnaîtras-tu ces musiques cultes ?
@@ -222,7 +225,7 @@ export default function Home() {
                   key={value}
                   onClick={() => {
                     setSelectedDifficulty(value);
-                    sessionStorage.setItem('blindtest_difficulty', value);
+                    sessionStorage.setItem('blindtoss_difficulty', value);
                   }}
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2 ${
                     selectedDifficulty === value

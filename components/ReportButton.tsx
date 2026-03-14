@@ -10,11 +10,12 @@ interface ReportButtonProps {
 export default function ReportButton({ trackId, label }: ReportButtonProps) {
   const [isReported, setIsReported] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [message, setMessage] = useState('');
 
-  // Vérifier si déjà signalé dans cette session
   useEffect(() => {
     try {
-      const reportedTracks = sessionStorage.getItem('blindtest_reported_tracks');
+      const reportedTracks = sessionStorage.getItem('blindtoss_reported_tracks');
       if (reportedTracks) {
         const reported = JSON.parse(reportedTracks) as number[];
         if (reported.includes(trackId)) {
@@ -33,16 +34,18 @@ export default function ReportButton({ trackId, label }: ReportButtonProps) {
     try {
       const res = await fetch(`/api/tracks/${trackId}/report`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message.trim() }),
       });
 
       if (res.ok) {
         setIsReported(true);
-        // Sauvegarder dans sessionStorage pour éviter les double reports
+        setIsOpen(false);
         try {
-          const reportedTracks = sessionStorage.getItem('blindtest_reported_tracks');
+          const reportedTracks = sessionStorage.getItem('blindtoss_reported_tracks');
           const reported = reportedTracks ? JSON.parse(reportedTracks) : [];
           reported.push(trackId);
-          sessionStorage.setItem('blindtest_reported_tracks', JSON.stringify(reported));
+          sessionStorage.setItem('blindtoss_reported_tracks', JSON.stringify(reported));
         } catch {
           // Ignorer les erreurs sessionStorage
         }
@@ -54,18 +57,48 @@ export default function ReportButton({ trackId, label }: ReportButtonProps) {
     }
   };
 
+  if (isReported) {
+    return <span className="text-xs px-2 py-1 text-white/40">✓ Signalé</span>;
+  }
+
+  if (isOpen) {
+    return (
+      <div className="flex flex-col gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value.slice(0, 200))}
+          placeholder="Décris le problème (optionnel)..."
+          className="input-aero w-full px-3 py-2 text-white rounded-lg text-xs resize-none"
+          rows={2}
+          autoFocus
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-white/30 text-xs flex-1">{message.length}/200</span>
+          <button
+            onClick={() => { setIsOpen(false); setMessage(''); }}
+            className="text-xs px-2 py-1 text-white/50 hover:text-white/80 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleReport}
+            disabled={isLoading}
+            className="text-xs px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all disabled:opacity-50"
+          >
+            {isLoading ? 'Envoi...' : 'Envoyer'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
-      onClick={handleReport}
-      disabled={isReported || isLoading}
-      className={`text-xs px-2 py-1 rounded transition-all ${
-        isReported
-          ? 'text-white/40 cursor-default'
-          : 'text-white/50 hover:text-red-400 hover:bg-red-400/10'
-      }`}
-      title={isReported ? 'Musique signalée' : 'Signaler un problème avec cette musique'}
+      onClick={() => setIsOpen(true)}
+      className="text-xs px-2 py-1 rounded transition-all text-white/50 hover:text-red-400 hover:bg-red-400/10"
+      title="Signaler un problème avec cette musique"
     >
-      {isLoading ? '...' : isReported ? '✓ Signalé' : `⚠ ${label || 'Signaler'}`}
+      ⚠ {label || 'Signaler'}
     </button>
   );
 }
