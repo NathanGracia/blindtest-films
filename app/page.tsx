@@ -323,13 +323,22 @@ export default function Home() {
       </div>
 
       {/* Footer with Admin Link */}
-      <footer className="p-4 text-center">
+      <footer className="p-4 text-center flex items-center justify-center gap-4">
         <Link
           href="/admin"
           className="text-white/20 hover:text-white/40 text-xs transition-colors"
         >
           Administration
         </Link>
+        <span className="text-white/10">·</span>
+        <a
+          href="https://nathangracia.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white/20 hover:text-white/40 text-xs transition-colors"
+        >
+          nathangracia.com
+        </a>
       </footer>
     </div>
   );
