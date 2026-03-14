@@ -29,6 +29,15 @@ model Track {
   difficulty      String?              // "easy" | "medium" | "hard" | null
   categoryId      String
   category        Category @relation(fields: [categoryId], references: [id])
+  reports         Report[]
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  trackId   Int
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  message   String   @default("")
+  createdAt DateTime @default(now())
 }
 
 model LadderEntry {

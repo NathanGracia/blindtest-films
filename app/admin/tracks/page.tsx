@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Track, Category } from '@/types';
 
@@ -11,6 +11,13 @@ interface CategoryWithCount extends Category {
 type SortField = 'title' | 'category' | 'reports' | 'default';
 type SortDirection = 'asc' | 'desc';
 type DifficultyFilter = '' | 'untagged' | 'easy' | 'medium' | 'hard';
+
+interface Report {
+  id: number;
+  trackId: number;
+  message: string;
+  createdAt: string;
+}
 
 const DIFFICULTY_CONFIG = {
   easy:   { label: 'Facile',  color: '#7fba00', dot: '🟢' },
@@ -38,6 +45,11 @@ export default function TracksPage() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  // Reports
+  const [expandedReports, setExpandedReports] = useState<number | null>(null);
+  const [reportsData, setReportsData] = useState<Record<number, Report[]>>({});
+  const [reportsLoading, setReportsLoading] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -98,6 +110,26 @@ export default function TracksPage() {
     }
   };
 
+  const toggleReports = async (trackId: number) => {
+    if (expandedReports === trackId) {
+      setExpandedReports(null);
+      return;
+    }
+    setExpandedReports(trackId);
+    if (!reportsData[trackId]) {
+      setReportsLoading(trackId);
+      try {
+        const res = await fetch(`/api/admin/tracks/${trackId}/reports`);
+        if (res.ok) {
+          const data = await res.json();
+          setReportsData(prev => ({ ...prev, [trackId]: data }));
+        }
+      } finally {
+        setReportsLoading(null);
+      }
+    }
+  };
+
   const handleResetReports = async (id: number) => {
     setError('');
     try {
@@ -108,10 +140,9 @@ export default function TracksPage() {
       });
 
       if (res.ok) {
-        // Mettre à jour le track dans la liste
-        setTracks(tracks.map(t =>
-          t.id === id ? { ...t, reportCount: 0 } : t
-        ));
+        setTracks(tracks.map(t => t.id === id ? { ...t, reportCount: 0 } : t));
+        setReportsData(prev => ({ ...prev, [id]: [] }));
+        setExpandedReports(null);
       } else {
         const data = await res.json();
         setError(data.error || 'Erreur lors du reset');
@@ -432,7 +463,8 @@ export default function TracksPage() {
               {filteredTracks.map((track) => {
                 const category = categories.find(c => c.id === track.categoryId);
                 return (
-                  <tr key={track.id} className="border-b border-white/5 hover:bg-white/5">
+                  <React.Fragment key={track.id}>
+                  <tr className="border-b border-white/5 hover:bg-white/5">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         {track.imageFile ? (
@@ -500,9 +532,13 @@ export default function TracksPage() {
                       <div className="flex items-center gap-2">
                         {(track.reportCount || 0) > 0 ? (
                           <>
-                            <span className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-400 font-medium">
-                              {track.reportCount}
-                            </span>
+                            <button
+                              onClick={() => toggleReports(track.id)}
+                              className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-400 font-medium hover:bg-red-500/30 transition-colors"
+                              title="Voir les messages de signalement"
+                            >
+                              {track.reportCount} {expandedReports === track.id ? '▲' : '▼'}
+                            </button>
                             <button
                               onClick={() => handleResetReports(track.id)}
                               className="px-2 py-1 text-xs rounded bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
@@ -550,6 +586,33 @@ export default function TracksPage() {
                       </div>
                     </td>
                   </tr>
+                  {expandedReports === track.id && (
+                    <tr className="border-b border-white/5 bg-red-500/5">
+                      <td colSpan={7} className="px-4 pb-3 pt-0">
+                        {reportsLoading === track.id ? (
+                          <p className="text-white/40 text-sm">Chargement...</p>
+                        ) : (reportsData[track.id] || []).length === 0 ? (
+                          <p className="text-white/40 text-sm italic">Aucun message laissé</p>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {(reportsData[track.id] || []).map(r => (
+                              <div key={r.id} className="flex items-start gap-3 text-sm">
+                                <span className="text-white/30 shrink-0 text-xs pt-0.5">
+                                  {new Date(r.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {r.message ? (
+                                  <span className="text-white/80">{r.message}</span>
+                                ) : (
+                                  <span className="text-white/30 italic">sans message</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

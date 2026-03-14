@@ -26,7 +26,7 @@ export async function POST(
       // Pas de body JSON
     }
 
-    const success = await reportTrack(trackId);
+    const success = await reportTrack(trackId, message);
     if (!success) {
       return NextResponse.json({ error: 'Erreur lors du signalement' }, { status: 500 });
     }

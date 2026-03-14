@@ -175,26 +175,47 @@ export async function countTracksByCategory(): Promise<Record<string, number>> {
   return result;
 }
 
-// Signaler un track (incrémenter le compteur de reports)
-export async function reportTrack(id: number): Promise<boolean> {
+// Signaler un track (incrémenter le compteur de reports + persister le message)
+export async function reportTrack(id: number, message: string = ''): Promise<boolean> {
   try {
-    await prisma.track.update({
-      where: { id },
-      data: { reportCount: { increment: 1 } },
-    });
+    await prisma.$transaction([
+      prisma.track.update({
+        where: { id },
+        data: { reportCount: { increment: 1 } },
+      }),
+      prisma.report.create({
+        data: { trackId: id, message: message.slice(0, 200) },
+      }),
+    ]);
     return true;
   } catch {
     return false;
   }
 }
 
-// Réinitialiser le compteur de reports d'un track
+// Récupérer les reports d'un track
+export async function getReportsByTrackId(trackId: number) {
+  return prisma.report.findMany({
+    where: { trackId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+// Supprimer tous les reports d'un track
+export async function deleteReportsByTrackId(trackId: number): Promise<void> {
+  await prisma.report.deleteMany({ where: { trackId } });
+}
+
+// Réinitialiser le compteur de reports d'un track (et supprimer les messages)
 export async function resetReportCount(id: number): Promise<boolean> {
   try {
-    await prisma.track.update({
-      where: { id },
-      data: { reportCount: 0 },
-    });
+    await prisma.$transaction([
+      prisma.report.deleteMany({ where: { trackId: id } }),
+      prisma.track.update({
+        where: { id },
+        data: { reportCount: 0 },
+      }),
+    ]);
     return true;
   } catch {
     return false;
