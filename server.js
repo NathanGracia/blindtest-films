@@ -1141,6 +1141,39 @@ app.prepare().then(async () => {
       }
     });
 
+    // Charger la note d'un track pour l'utilisateur courant
+    socket.on('note:load', async ({ trackId }, callback) => {
+      if (!currentUserId) {
+        if (callback) callback({ note: '' });
+        return;
+      }
+      try {
+        const record = await prisma.userTrackNote.findUnique({
+          where: { userId_trackId: { userId: currentUserId, trackId } },
+        });
+        if (callback) callback({ note: record?.note || '' });
+        else socket.emit('note:data', { trackId, note: record?.note || '' });
+      } catch (err) {
+        console.error('[NOTE] Erreur load:', err);
+        if (callback) callback({ note: '' });
+      }
+    });
+
+    // Sauvegarder la note d'un track
+    socket.on('note:save', async ({ trackId, note }) => {
+      if (!currentUserId) return;
+      try {
+        await prisma.userTrackNote.upsert({
+          where: { userId_trackId: { userId: currentUserId, trackId } },
+          update: { note: String(note || '').slice(0, 100) },
+          create: { userId: currentUserId, trackId, note: String(note || '').slice(0, 100) },
+        });
+        socket.emit('note:saved', { trackId });
+      } catch (err) {
+        console.error('[NOTE] Erreur save:', err);
+      }
+    });
+
     // Quitter la room volontairement
     socket.on('room:leave', () => {
       if (currentRoom) {

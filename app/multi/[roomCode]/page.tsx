@@ -11,6 +11,7 @@ import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
 import DeterminossNotif from '@/components/DeterminossNotif';
+import TrackHistoryPanel, { PlayedTrack } from '@/components/TrackHistoryPanel';
 import Link from 'next/link';
 import UserAvatar from '@/components/UserAvatar';
 import { Player, ChatMessage, RoomState, Category } from '@/types';
@@ -73,14 +74,21 @@ export default function MultiGameRoom() {
   const [remainingLives, setRemainingLives] = useState(3);
   const [gameStartKey, setGameStartKey] = useState(0);
 
+  // Historique des tracks joués + notes
+  const [playedTracks, setPlayedTracks] = useState<PlayedTrack[]>([]);
+  const [trackNotes, setTrackNotes] = useState<Record<number, string>>({});
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   const socketRef = useRef(getSocket());
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const currentDifficultyRef = useRef<string | null>(null);
+  const currentCategoryIdRef = useRef<string | null>(null);
 
   const myId = socketRef.current.id;
 
-  // Charger les catégories
+  // Charger les catégories + vérifier si connecté
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -92,7 +100,14 @@ export default function MultiGameRoom() {
         console.error('Erreur chargement catégories:', error);
       }
     };
+    const checkUser = async () => {
+      try {
+        const res = await fetch('/api/user/me');
+        if (res.ok) setIsLoggedIn(true);
+      } catch {}
+    };
     loadCategories();
+    checkUser();
   }, []);
 
   // Fonction pour charger les réponses disponibles
@@ -238,7 +253,10 @@ export default function MultiGameRoom() {
       setShowResult(false);
       setTimeRemaining(data.timeLimit);
       setWinnerId(null);
-      if (data.trackIndex === 0) setGameStartKey((k) => k + 1);
+      if (data.trackIndex === 0) {
+        setGameStartKey((k) => k + 1);
+        setPlayedTracks([]);
+      }
       setResultImage(null);
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
@@ -304,6 +322,28 @@ export default function MultiGameRoom() {
         if (!prev) return prev;
         return { ...prev, players: data.players };
       });
+
+      // Ajouter au panel historique
+      if (data.trackId) {
+        const myId = socket.id;
+        const gotIt = data.finders.some(f => f.id === myId);
+        setPlayedTracks(prev => {
+          if (prev.some(t => t.trackId === data.trackId)) return prev;
+          return [...prev, {
+            trackId: data.trackId!,
+            title: data.title,
+            titleVF: data.titleVF || null,
+            imageFile: data.imageFile || null,
+            difficulty: currentDifficultyRef.current,
+            categoryId: currentCategoryIdRef.current,
+            gotIt,
+          }];
+        });
+        // Charger la note existante
+        socket.emit('note:load', { trackId: data.trackId }, ({ note }: { note: string }) => {
+          if (note) setTrackNotes(prev => ({ ...prev, [data.trackId!]: note }));
+        });
+      }
     });
 
     socket.on('game:next', (data: { trackIndex: number; trackId: number; imageFile?: string; timeLimit: number; startTime?: number; totalTracks: number; categoryId?: string; difficulty?: string | null }) => {
@@ -363,6 +403,10 @@ export default function MultiGameRoom() {
       }
     });
 
+    socket.on('note:saved', ({ trackId }: { trackId: number }) => {
+      // Confirmation silencieuse — la note est déjà dans le state local
+    });
+
     return () => {
       // Emit leave when the component unmounts so server state is cleaned up
       socket.emit('room:leave');
@@ -383,6 +427,7 @@ export default function MultiGameRoom() {
       socket.off('public:countdown');
       socket.off('public:restart-countdown');
       socket.off('game:wrong-answer');
+      socket.off('note:saved');
     };
   }, [router, roomCode]);
 
@@ -397,6 +442,10 @@ export default function MultiGameRoom() {
       inputRef.current?.focus();
     }
   }, [isPlaying]);
+
+  // Synchroniser les refs pour les closures WebSocket
+  useEffect(() => { currentDifficultyRef.current = currentDifficulty; }, [currentDifficulty]);
+  useEffect(() => { currentCategoryIdRef.current = currentCategoryId; }, [currentCategoryId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -506,6 +555,14 @@ export default function MultiGameRoom() {
 
   const handleStartGame = () => {
     socketRef.current.emit('game:start');
+  };
+
+  const handleNoteChange = (trackId: number, note: string) => {
+    setTrackNotes(prev => ({ ...prev, [trackId]: note }));
+  };
+
+  const handleNoteSave = (trackId: number, note: string) => {
+    socketRef.current.emit('note:save', { trackId, note });
   };
 
   if (!room) {
@@ -1041,6 +1098,15 @@ export default function MultiGameRoom() {
             />
           </div>
         </div>
+
+        {/* Panel historique des tracks */}
+        <TrackHistoryPanel
+          tracks={playedTracks}
+          notes={trackNotes}
+          isLoggedIn={isLoggedIn}
+          onNoteChange={handleNoteChange}
+          onNoteSave={handleNoteSave}
+        />
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ model Track {
   categoryId      String
   category        Category @relation(fields: [categoryId], references: [id])
   reports         Report[]
+  notes           UserTrackNote[]
 }
 
 model Report {
@@ -49,6 +50,19 @@ model User {
   isAdmin      Boolean      @default(false)
   createdAt    DateTime     @default(now())
   gameHistory  GameResult[]
+  notes        UserTrackNote[]
+}
+
+model UserTrackNote {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackId   Int
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  note      String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, trackId])
 }
 
 model GameResult {
