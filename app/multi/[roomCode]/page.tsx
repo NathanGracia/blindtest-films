@@ -77,6 +77,7 @@ export default function MultiGameRoom() {
   // Historique des tracks joués + notes
   const [playedTracks, setPlayedTracks] = useState<PlayedTrack[]>([]);
   const [trackNotes, setTrackNotes] = useState<Record<number, string>>({});
+  const [noteSaveStatus, setNoteSaveStatus] = useState<Record<number, 'saving' | 'saved'>>({});
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const socketRef = useRef(getSocket());
@@ -85,6 +86,8 @@ export default function MultiGameRoom() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const currentDifficultyRef = useRef<string | null>(null);
   const currentCategoryIdRef = useRef<string | null>(null);
+  const trackNotesRef = useRef<Record<number, string>>({});
+  const noteDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const myId = socketRef.current.id;
 
@@ -103,7 +106,10 @@ export default function MultiGameRoom() {
     const checkUser = async () => {
       try {
         const res = await fetch('/api/user/me');
-        if (res.ok) setIsLoggedIn(true);
+        if (res.ok) {
+          const data = await res.json();
+          setIsLoggedIn(!!data.user);
+        }
       } catch {}
     };
     loadCategories();
@@ -257,6 +263,14 @@ export default function MultiGameRoom() {
         setGameStartKey((k) => k + 1);
         setPlayedTracks([]);
       }
+      // Flush les notes en attente avant le prochain round
+      Object.entries(noteDebounceRef.current).forEach(([trackIdStr, timer]) => {
+        clearTimeout(timer);
+        const trackId = Number(trackIdStr);
+        const note = trackNotesRef.current[trackId];
+        if (note !== undefined) socket.emit('note:save', { trackId, note });
+      });
+      noteDebounceRef.current = {};
       setResultImage(null);
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
@@ -379,6 +393,14 @@ export default function MultiGameRoom() {
     });
 
     socket.on('game:end', (data: { players: Player[]; categoryStats?: Record<string, Record<string, number>> }) => {
+      // Flush les notes en attente avant la fin de partie
+      Object.entries(noteDebounceRef.current).forEach(([trackIdStr, timer]) => {
+        clearTimeout(timer);
+        const trackId = Number(trackIdStr);
+        const note = trackNotesRef.current[trackId];
+        if (note !== undefined) socket.emit('note:save', { trackId, note });
+      });
+      noteDebounceRef.current = {};
       setIsFinished(true);
       setFinalScores(data.players);
       setCategoryStats(data.categoryStats || {});
@@ -404,7 +426,7 @@ export default function MultiGameRoom() {
     });
 
     socket.on('note:saved', ({ trackId }: { trackId: number }) => {
-      // Confirmation silencieuse — la note est déjà dans le state local
+      setNoteSaveStatus(prev => ({ ...prev, [trackId]: 'saved' }));
     });
 
     return () => {
@@ -446,6 +468,7 @@ export default function MultiGameRoom() {
   // Synchroniser les refs pour les closures WebSocket
   useEffect(() => { currentDifficultyRef.current = currentDifficulty; }, [currentDifficulty]);
   useEffect(() => { currentCategoryIdRef.current = currentCategoryId; }, [currentCategoryId]);
+  useEffect(() => { trackNotesRef.current = trackNotes; }, [trackNotes]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -559,9 +582,21 @@ export default function MultiGameRoom() {
 
   const handleNoteChange = (trackId: number, note: string) => {
     setTrackNotes(prev => ({ ...prev, [trackId]: note }));
+    // Debounce auto-save 1.5s
+    if (noteDebounceRef.current[trackId]) clearTimeout(noteDebounceRef.current[trackId]);
+    noteDebounceRef.current[trackId] = setTimeout(() => {
+      delete noteDebounceRef.current[trackId];
+      setNoteSaveStatus(prev => ({ ...prev, [trackId]: 'saving' }));
+      socketRef.current.emit('note:save', { trackId, note });
+    }, 1500);
   };
 
   const handleNoteSave = (trackId: number, note: string) => {
+    if (noteDebounceRef.current[trackId]) {
+      clearTimeout(noteDebounceRef.current[trackId]);
+      delete noteDebounceRef.current[trackId];
+    }
+    setNoteSaveStatus(prev => ({ ...prev, [trackId]: 'saving' }));
     socketRef.current.emit('note:save', { trackId, note });
   };
 
@@ -779,7 +814,7 @@ export default function MultiGameRoom() {
       {/* Notification Determinoss */}
       <DeterminossNotif gameStartKey={gameStartKey} />
 
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <button
@@ -793,9 +828,24 @@ export default function MultiGameRoom() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[270px_80px_1fr_80px_220px] items-start">
+          {/* Sidebar gauche - Historique */}
+          <div className="hidden lg:block" style={{ height: 'calc(100vh - 140px)', position: 'sticky', top: 16 }}>
+            <TrackHistoryPanel
+              tracks={playedTracks}
+              notes={trackNotes}
+              noteSaveStatus={noteSaveStatus}
+              isLoggedIn={isLoggedIn}
+              onNoteChange={handleNoteChange}
+              onNoteSave={handleNoteSave}
+            />
+          </div>
+
+          {/* Spacer gauche */}
+          <div className="hidden lg:block" />
+
           {/* Colonne principale */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-4">
             {/* Info musique */}
             <div className="flex justify-center items-center glass rounded-xl p-3">
               <span className="text-white/60">
@@ -811,152 +861,148 @@ export default function MultiGameRoom() {
               previousTrackId={!showResult ? previousTrackId || undefined : undefined}
             />
 
-            {/* Audio */}
-            <div className="flex justify-center py-4">
-              <AudioPlayer
-                trackId={room.currentTrack?.trackId || 0}
-                isPlaying={isPlaying}
-                startTime={room.currentTrack?.startTime || 0}
-                volume={volume}
-              />
-            </div>
+            {/* Zone alternante jeu/reveal — grid overlay pour hauteur stable */}
+            <div style={{ display: 'grid' }}>
 
-            {/* Indicateur "Tu as trouvé" */}
-            {hasFoundThisRound && !showResult && (
-              <div className="glass rounded-xl p-4 text-center bg-[#7fba00]/20 border border-[#7fba00]/50">
-                <p className="text-[#7fba00] font-semibold text-lg">
-                  Tu as trouvé! +{myScoreThisRound} pts
-                </p>
-                <p className="text-white/60 text-sm mt-1">
-                  En attente de la fin du round...
-                </p>
-              </div>
-            )}
-
-            {/* Indicateur nombre de joueurs qui ont trouvé */}
-            {findersCount > 0 && !hasFoundThisRound && !showResult && (
-              <div className="glass rounded-xl p-3 text-center">
-                <p className="text-white/70">
-                  {findersCount} joueur{findersCount > 1 ? 's ont' : ' a'} trouvé!
-                </p>
-              </div>
-            )}
-
-            {/* Résultat */}
-            {showResult && (
+              {/* État : jeu en cours */}
               <div
-                className={`glass rounded-xl p-6 text-center ${
-                  roundFinders.length > 0 ? 'glow-green' : ''
-                }`}
+                style={{ gridArea: '1 / 1' }}
+                className={`flex flex-col justify-between${showResult ? ' invisible pointer-events-none' : ''}`}
               >
-                {roundFinders.length > 0 ? (
-                  <>
-                    <p className="text-[#7fba00] text-xl font-semibold">
-                      {roundFinders.length === 1
-                        ? `✓ ${roundFinders[0].pseudo} a trouvé!`
-                        : `✓ ${roundFinders.length} joueurs ont trouvé!`}
+                {/* Indicateur "Tu as trouvé" */}
+                {hasFoundThisRound ? (
+                  <div className="glass rounded-xl p-4 text-center bg-[#7fba00]/20 border border-[#7fba00]/50">
+                    <p className="text-[#7fba00] font-semibold text-lg">
+                      Tu as trouvé! +{myScoreThisRound} pts
                     </p>
-                    {roundFinders.length > 1 && (
-                      <p className="text-white/60 text-sm mt-1">
-                        {roundFinders.map(f => f.pseudo).join(', ')}
-                      </p>
-                    )}
-                  </>
+                    <p className="text-white/60 text-sm mt-1">
+                      En attente de la fin du round...
+                    </p>
+                  </div>
+                ) : findersCount > 0 ? (
+                  <div className="glass rounded-xl p-3 text-center">
+                    <p className="text-white/70">
+                      {findersCount} joueur{findersCount > 1 ? 's ont' : ' a'} trouvé!
+                    </p>
+                  </div>
                 ) : (
-                  <p className="text-red-400 text-xl font-semibold">
-                    ✗ Personne n&apos;a trouvé!
-                  </p>
-                )}
-
-                {/* Image de révélation */}
-                {resultImage && (
-                  <div className="my-4 flex justify-center">
-                    <RevealImage
-                      src={resultImage}
-                      alt={resultTitle}
-                      className="max-w-xs"
-                    />
+                  <div className="glass rounded-xl p-3 text-center opacity-0 pointer-events-none select-none" aria-hidden>
+                    <p className="text-white/70">placeholder</p>
                   </div>
                 )}
 
-                <p className="text-3xl font-bold text-white mt-3 text-glow">{resultTitle}</p>
-                {resultTitleVF && (
-                  <p className="text-xl text-white/70 mt-1">
-                    ({resultTitleVF})
-                  </p>
-                )}
-                {resultTrackId && (
-                  <div className="mt-2">
-                    <ReportButton trackId={resultTrackId} />
-                  </div>
-                )}
-              </div>
-            )}
+                {/* Audio — flex-1 pour pousser le disque vers le milieu */}
+                <div className="flex-1 flex items-center justify-center">
+                  <AudioPlayer
+                    trackId={room.currentTrack?.trackId || 0}
+                    isPlaying={isPlaying}
+                    startTime={room.currentTrack?.startTime || 0}
+                    volume={volume}
+                  />
+                </div>
 
-            {/* Catégorie + Difficulté */}
-            {currentCategoryId && !showResult && (
-              <div className="flex justify-center items-center gap-2">
-                {(() => {
-                  const category = categories.find((c) => c.id === currentCategoryId);
-                  if (!category) return null;
-                  const icon = ICONS[category.icon] || ICONS.default;
-                  return (
-                    <div
-                      className="glass rounded-xl px-4 py-2 flex items-center gap-2"
-                      style={{ borderColor: category.color, borderWidth: '2px' }}
-                    >
-                      <span style={{ color: category.color }} className="text-xl">
-                        {icon}
-                      </span>
-                      <span className="text-white font-semibold">{category.name}</span>
-                    </div>
-                  );
-                })()}
-                {currentDifficulty && (() => {
-                  const config: Record<string, { label: string; color: string; bg: string; border: string }> = {
-                    easy:   { label: 'Facile',   color: '#7fba00', bg: 'rgba(127,186,0,0.15)',   border: 'rgba(127,186,0,0.5)' },
-                    medium: { label: 'Moyen',    color: '#f5a623', bg: 'rgba(245,166,35,0.15)',  border: 'rgba(245,166,35,0.5)' },
-                    hard:   { label: 'Difficile', color: '#e8445a', bg: 'rgba(232,68,90,0.15)',   border: 'rgba(232,68,90,0.5)' },
-                  };
-                  const d = config[currentDifficulty];
-                  if (!d) return null;
-                  return (
-                    <div
-                      className="glass rounded-xl px-3 py-2 flex items-center gap-1.5"
-                      style={{ backgroundColor: d.bg, borderColor: d.border, borderWidth: '2px' }}
-                    >
-                      <span style={{ color: d.color }} className="text-sm font-bold">{d.label}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Points de vie */}
-            {!showResult && isPlaying && (
-              <div className="flex justify-center">
-                <div className="glass rounded-xl px-4 py-2 flex items-center gap-2">
-                  <span className="text-white/60 text-sm font-semibold">Vies :</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3].map((heart) => (
-                      <span
-                        key={heart}
-                        className={`text-xl transition-all ${
-                          heart <= remainingLives
-                            ? 'opacity-100 scale-100'
-                            : 'opacity-30 scale-75'
-                        }`}
+                {/* Catégorie + Difficulté */}
+                <div className="flex justify-center items-center gap-2">
+                  {(() => {
+                    const category = categories.find((c) => c.id === currentCategoryId);
+                    if (!category) return <div className="h-10" />;
+                    const icon = ICONS[category.icon] || ICONS.default;
+                    return (
+                      <div
+                        className="glass rounded-xl px-4 py-2 flex items-center gap-2"
+                        style={{ borderColor: category.color, borderWidth: '2px' }}
                       >
-                        {heart <= remainingLives ? '❤️' : '🖤'}
-                      </span>
-                    ))}
+                        <span style={{ color: category.color }} className="text-xl">{icon}</span>
+                        <span className="text-white font-semibold">{category.name}</span>
+                      </div>
+                    );
+                  })()}
+                  {currentDifficulty && (() => {
+                    const config: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                      easy:   { label: 'Facile',    color: '#7fba00', bg: 'rgba(127,186,0,0.15)',  border: 'rgba(127,186,0,0.5)' },
+                      medium: { label: 'Moyen',     color: '#f5a623', bg: 'rgba(245,166,35,0.15)', border: 'rgba(245,166,35,0.5)' },
+                      hard:   { label: 'Difficile', color: '#e8445a', bg: 'rgba(232,68,90,0.15)',  border: 'rgba(232,68,90,0.5)' },
+                    };
+                    const d = config[currentDifficulty];
+                    if (!d) return null;
+                    return (
+                      <div
+                        className="glass rounded-xl px-3 py-2 flex items-center gap-1.5"
+                        style={{ backgroundColor: d.bg, borderColor: d.border, borderWidth: '2px' }}
+                      >
+                        <span style={{ color: d.color }} className="text-sm font-bold">{d.label}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Points de vie */}
+                <div className="flex justify-center mt-3">
+                  <div className="glass rounded-xl px-4 py-2 flex items-center gap-2">
+                    <span className="text-white/60 text-sm font-semibold">Vies :</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3].map((heart) => (
+                        <span
+                          key={heart}
+                          className={`text-xl transition-all ${
+                            heart <= remainingLives ? 'opacity-100 scale-100' : 'opacity-30 scale-75'
+                          }`}
+                        >
+                          {heart <= remainingLives ? '❤️' : '🖤'}
+                        </span>
+                      ))}
+                    </div>
+                    {remainingLives === 0 && (
+                      <span className="text-red-400 text-xs ml-2">(Chat uniquement)</span>
+                    )}
                   </div>
-                  {remainingLives === 0 && (
-                    <span className="text-red-400 text-xs ml-2">(Chat uniquement)</span>
-                  )}
                 </div>
               </div>
-            )}
+
+              {/* État : reveal */}
+              <div
+                style={{ gridArea: '1 / 1' }}
+                className={`flex flex-col justify-center${!showResult ? ' invisible pointer-events-none' : ''}`}
+              >
+                <div className={`glass rounded-xl p-6 text-center ${roundFinders.length > 0 ? 'glow-green' : ''}`}>
+                  {roundFinders.length > 0 ? (
+                    <>
+                      <p className="text-[#7fba00] text-xl font-semibold">
+                        {roundFinders.length === 1
+                          ? `✓ ${roundFinders[0].pseudo} a trouvé!`
+                          : `✓ ${roundFinders.length} joueurs ont trouvé!`}
+                      </p>
+                      {roundFinders.length > 1 && (
+                        <p className="text-white/60 text-sm mt-1">
+                          {roundFinders.map(f => f.pseudo).join(', ')}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-red-400 text-xl font-semibold">
+                      ✗ Personne n&apos;a trouvé!
+                    </p>
+                  )}
+
+                  {/* Zone image — toujours réservée pour éviter les sauts */}
+                  <div className="my-4 flex justify-center">
+                    <div style={{ width: '12rem', aspectRatio: '2/3', position: 'relative' }}>
+                      {resultImage && (
+                        <RevealImage src={resultImage} alt={resultTitle} className="w-full h-full object-cover rounded-lg" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Titre — espace toujours réservé */}
+                  <p className="text-3xl font-bold text-white mt-3 text-glow min-h-[2.5rem]">{resultTitle}</p>
+                  <p className="text-xl text-white/70 mt-1 min-h-[1.75rem]">{resultTitleVF ? `(${resultTitleVF})` : ''}</p>
+                  <div className="mt-2 min-h-[2rem]">
+                    {resultTrackId && <ReportButton trackId={resultTrackId} />}
+                  </div>
+                </div>
+              </div>
+
+            </div>
 
             {/* Chat / Réponses */}
             <div className="relative">
@@ -1088,8 +1134,11 @@ export default function MultiGameRoom() {
             </div>
           </div>
 
-          {/* Sidebar - Liste des joueurs */}
-          <div className="lg:col-span-1">
+          {/* Spacer droite */}
+          <div className="hidden lg:block" />
+
+          {/* Sidebar droite - Liste des joueurs */}
+          <div>
             <PlayerList
               players={room.players}
               hostId={room.hostId}
@@ -1098,15 +1147,6 @@ export default function MultiGameRoom() {
             />
           </div>
         </div>
-
-        {/* Panel historique des tracks */}
-        <TrackHistoryPanel
-          tracks={playedTracks}
-          notes={trackNotes}
-          isLoggedIn={isLoggedIn}
-          onNoteChange={handleNoteChange}
-          onNoteSave={handleNoteSave}
-        />
       </div>
     </div>
   );

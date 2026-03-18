@@ -12,7 +12,7 @@ Application de blindtest musical pour films/series/jeux/anime. Style Skribbl.io 
 
 ```bash
 # Developpement
-npm run dev              # Serveur dev (port 3000) - inclut Socket.IO
+npm run dev              # Serveur dev (port 3001) - inclut Socket.IO
 npm run build            # Build production
 npm start                # Serveur production
 
@@ -57,6 +57,9 @@ blindtest-films/
 │   ├── AnswerInput.tsx         # Input + historique tentatives
 │   ├── Timer.tsx               # Barre temps restant
 │   ├── CategorySelector.tsx    # Selection categories
+│   ├── TrackHistoryPanel.tsx   # Sidebar gauche historique + notes
+│   ├── RevealImage.tsx         # Affiche animée au reveal
+│   ├── UserAvatar.tsx          # Avatar carré arrondi style Vista
 │   └── admin/                  # Composants admin
 │
 ├── lib/
@@ -163,8 +166,50 @@ model Track {
   timeLimit       Int      @default(30)   // Secondes
   startTime       Int      @default(0)    // Debut lecture audio
   reportCount     Int      @default(0)    // Signalements
+  difficulty      String?                 // "easy" | "medium" | "hard" | null
   categoryId      String
   category        Category @relation(...)
+  reports         Report[]
+  notes           UserTrackNote[]
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  trackId   Int
+  track     Track    @relation(onDelete: Cascade)
+  message   String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model UserTrackNote {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  trackId   Int
+  note      String   @default("")    // Max 100 chars (enforced server-side)
+  updatedAt DateTime @updatedAt
+  @@unique([userId, trackId])
+}
+
+model GameResult {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  score        Int
+  rank         Int
+  totalPlayers Int
+  tracksFound  Int
+  totalTracks  Int
+  categories   String   // JSON ["films","series"]
+  roomCode     String
+  playedAt     DateTime @default(now())
+}
+
+model LadderEntry {
+  pseudo      String
+  bestScore   Int
+  weekId      String   // "2026-W04"
+  lastGameAt  DateTime
+  gamesPlayed Int
+  @@unique([pseudo, weekId])
 }
 ```
 
@@ -225,6 +270,31 @@ if (isAnswerFromSuggestion(answer, currentTrack.categoryId) && !isCorrect) {
 - ✅ Comparaison directe avec les vrais titres (pas de tracking de flag)
 - ✅ Simple et fiable : titre exact = suggestion, sinon = chat libre
 
+### Système de notes (server.js + TrackHistoryPanel)
+
+Les utilisateurs connectés peuvent annoter chaque track joué (trigger, indice...) dans la sidebar historique.
+
+- **Stockage** : `UserTrackNote` (userId + trackId unique, 100 chars max)
+- **Chargement** : `note:load` (avec ack callback) émis sur `game:round-end`
+- **Sauvegarde** : debounce 1.5s sur `onChange` + `onBlur` immédiat + flush forcé sur `game:start` et `game:end`
+- **Feedback** : "✓ Sauvegardé" affiché en permanence après save, "Envoi..." pendant le transit
+- **Guest** : textarea masquée, message global "Connectez-vous pour enregistrer des notes"
+- **Détection login** : `/api/user/me` retourne `{ user: null }` pour les guests → vérifier `data.user !== null`
+
+```js
+// Events Socket.IO notes
+socket.on('note:load', async ({ trackId }, callback) => { ... }) // callback({ note })
+socket.on('note:save', async ({ trackId, note }) => { ... })     // émet note:saved
+socket.emit('note:saved', { trackId })
+```
+
+### Système de signalement
+
+- **POST /api/tracks/[id]/report** : incrémente `reportCount` ET crée un `Report` (avec message)
+- **GET /api/admin/tracks/[id]/reports** : liste les reports d'un track (admin)
+- **Interface admin** : ligne expandable dans `/admin/tracks` avec date + message par report
+- **Reset** : remet `reportCount` à 0 ET supprime les `Report` associés
+
 ### Multijoueur (server.js)
 - Room publique "PUBLIC" : permanente, 25 tracks, countdown 30s
 - Rooms privees : code 6 caracteres (ABC123)
@@ -238,11 +308,21 @@ if (isAnswerFromSuggestion(answer, currentTrack.categoryId) && !isCorrect) {
 # Publiques
 GET  /api/tracks?categories=films,series   # Tracks filtres
 GET  /api/categories                       # Categories avec counts
-POST /api/tracks/[id]/report               # Signaler track
+POST /api/tracks/[id]/report               # Signaler track (+ message)
+GET  /api/answers?categories=...           # Titres pour suggestions (autocomplete)
+
+# Utilisateur
+POST /api/user/register                    # Créer un compte
+POST /api/user/login                       # Connexion
+POST /api/user/logout                      # Déconnexion
+GET  /api/user/me                          # Utilisateur courant ({ user: null } si guest)
+PATCH /api/user/profile                    # Modifier displayName / mot de passe
+POST /api/user/avatar                      # Upload photo de profil
 
 # Admin (protegees par middleware)
 GET/POST   /api/admin/tracks               # CRUD tracks
 GET/PATCH/DELETE /api/admin/tracks/[id]
+GET        /api/admin/tracks/[id]/reports  # Reports d'un track
 GET/POST   /api/admin/categories           # CRUD categories
 POST       /api/admin/upload               # Upload audio/images
 POST       /api/auth/login                 # Connexion admin
@@ -278,6 +358,9 @@ IMPORT_API_TOKEN=xxx         # Token scripts Python (defaut: ADMIN_PASSWORD)
 3. **acceptedAnswers** est stocke en JSON string, pas en array natif
 4. **Scripts Python** necessitent le serveur Next.js lance (pour POST /api/import)
 5. **public/audio** et **public/images** sont volumineux et montes en volumes Docker
+6. **Port dev** : 3001 (pas 3000, pris par un autre projet)
+7. **/api/user/me** retourne toujours HTTP 200 — tester `data.user !== null` pour savoir si connecté
+8. **Notes** : flush forcé sur `game:start` ET `game:end` via `noteDebounceRef` + `trackNotesRef`
 
 ---
 
