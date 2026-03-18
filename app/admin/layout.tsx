@@ -7,6 +7,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: '📊' },
   { href: '/admin/categories', label: 'Catégories', icon: '📁' },
   { href: '/admin/tracks', label: 'Musiques', icon: '🎵' },
+  { href: '/admin/users', label: 'Utilisateurs', icon: '👥' },
 ];
 
 export default function AdminLayout({
@@ -23,8 +24,8 @@ export default function AdminLayout({
   }
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/admin/login');
+    await fetch('/api/user/logout', { method: 'POST' });
+    router.push('/');
   };
 
   return (

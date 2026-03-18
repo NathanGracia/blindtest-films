@@ -7,7 +7,17 @@ import Image from 'next/image';
 import CategorySelector from '@/components/CategorySelector';
 import LadderSidebar from '@/components/LadderSidebar';
 import UpdatesSidebar from '@/components/UpdatesSidebar';
+import UserMenu from '@/components/UserMenu';
+import AuthModal from '@/components/AuthModal';
 import { getSocket } from '@/lib/socket';
+
+interface CurrentUser {
+  id: number;
+  username: string;
+  displayName?: string | null;
+  avatarFile?: string | null;
+  isAdmin?: boolean;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -18,11 +28,26 @@ export default function Home() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Charger la session utilisateur
+  useEffect(() => {
+    fetch('/api/user/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) {
+          setCurrentUser(data.user);
+          setPseudo(data.user.displayName || data.user.username);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Charger la sélection sauvegardée
   useEffect(() => {
     const savedPseudo = sessionStorage.getItem('blindtoss_pseudo');
-    if (savedPseudo) {
+    if (savedPseudo && !currentUser) {
       setPseudo(savedPseudo);
     }
 
@@ -137,8 +162,36 @@ export default function Home() {
     });
   };
 
+  const handleAuthSuccess = (user: CurrentUser) => {
+    setCurrentUser(user);
+    setPseudo(user.username);
+    setShowAuthModal(false);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    const savedPseudo = sessionStorage.getItem('blindtoss_pseudo');
+    setPseudo(savedPseudo || '');
+  };
+
   return (
     <div className="min-h-screen aero-bg flex flex-col">
+      {/* Barre de navigation */}
+      <div className="flex justify-end p-3 pr-4">
+        <UserMenu
+          user={currentUser}
+          onLoginClick={() => setShowAuthModal(true)}
+          onLogout={handleLogout}
+        />
+      </div>
+
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
+
       <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center p-4 gap-8">
         {/* Sidebar Nouveautés - centré dans l'espace de gauche */}
         <div className="hidden lg:flex justify-center">
@@ -170,20 +223,28 @@ export default function Home() {
             />
           </div>
 
-          {/* Pseudo Input - Dans une card */}
-          <div className="mb-6 glass rounded-xl p-5">
-            <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold text-left">
-              Ton pseudo
-            </label>
-            <input
-              type="text"
-              value={pseudo}
-              onChange={(e) => setPseudo(e.target.value)}
-              placeholder="Ex: MovieFan42"
-              className="input-aero w-full px-4 py-3 text-white rounded-xl"
-              maxLength={20}
-            />
-          </div>
+          {/* Pseudo Input — uniquement pour les guests */}
+          {!currentUser && (
+            <div className="mb-6 glass rounded-xl p-5">
+              <label className="block text-[#7ec8e3] text-sm mb-2 font-semibold text-left">
+                Ton pseudo
+              </label>
+              <input
+                type="text"
+                value={pseudo}
+                onChange={(e) => setPseudo(e.target.value)}
+                placeholder="Ex: MovieFan42"
+                className="input-aero w-full px-4 py-3 text-white rounded-xl"
+                maxLength={20}
+              />
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="mt-2 text-white/30 hover:text-white/60 text-xs transition-colors"
+              >
+                Créer un compte pour sauvegarder tes scores →
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 glass rounded-lg border border-red-500/50 text-red-400 text-sm">
@@ -322,15 +383,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Footer with Admin Link */}
-      <footer className="p-4 text-center flex items-center justify-center gap-4">
-        <Link
-          href="/admin"
-          className="text-white/20 hover:text-white/40 text-xs transition-colors"
-        >
-          Administration
-        </Link>
-        <span className="text-white/10">·</span>
+      {/* Footer */}
+      <footer className="p-4 text-center">
         <a
           href="https://nathangracia.com"
           target="_blank"

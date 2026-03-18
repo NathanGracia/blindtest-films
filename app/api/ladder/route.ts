@@ -9,13 +9,28 @@ export async function GET() {
       take: 10,
     });
 
+    // Récupérer les avatars des users correspondants
+    const pseudos = entries.map(e => e.pseudo);
+    const users = await prisma.user.findMany({
+      where: { OR: [
+        { username: { in: pseudos } },
+        { displayName: { in: pseudos } },
+      ]},
+      select: { username: true, displayName: true, avatarFile: true },
+    });
+
     return NextResponse.json({
-      entries: entries.map((entry, index) => ({
-        rank: index + 1,
-        pseudo: entry.pseudo,
-        bestScore: entry.bestScore,
-        gamesPlayed: entry.gamesPlayed,
-      })),
+      entries: entries.map((entry, index) => {
+        const user = users.find(u => (u.displayName || u.username) === entry.pseudo || u.username === entry.pseudo);
+        return {
+          rank: index + 1,
+          pseudo: entry.pseudo,
+          bestScore: entry.bestScore,
+          gamesPlayed: entry.gamesPlayed,
+          avatarFile: user?.avatarFile ?? null,
+          username: user?.username ?? null,
+        };
+      }),
     });
   } catch (error) {
     console.error('Erreur lecture ladder:', error);

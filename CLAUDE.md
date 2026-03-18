@@ -26,6 +26,9 @@ python scripts/fixtures.py --categories films              # Importer films
 python scripts/fixtures.py --categories films --limit 10   # Limiter
 python scripts/clear_tracks.py                             # Vider tracks
 
+# Gestion des utilisateurs
+node scripts/make_admin.js <username>   # Passer un user en admin (prod)
+
 # Docker
 docker-compose up -d     # Lancer app + Caddy HTTPS
 ```
@@ -69,17 +72,73 @@ blindtest-films/
 │
 ├── public/
 │   ├── audio/                  # Fichiers MP3
-│   └── images/                 # Affiches films
+│   ├── images/                 # Affiches films
+│   └── avatars/                # Photos de profil uploadées
 │
-├── scripts/                    # Import Python
+├── scripts/                    # Import Python + utilitaires Node
 │   ├── fixtures.py             # Orchestrateur principal
 │   ├── data/films_list.json    # Liste films a importer
-│   └── utils/                  # OMDb, YouTube, answers
+│   ├── utils/                  # OMDb, YouTube, answers
+│   └── make_admin.js           # Promouvoir un user en admin
 │
 ├── server.js                   # Serveur Node + Socket.IO
 ├── middleware.ts               # Protection routes admin
 └── docker-compose.yml          # Orchestration Docker
 ```
+
+---
+
+## Système de comptes utilisateurs
+
+### Vue d'ensemble
+
+Les joueurs peuvent créer un compte (login + mot de passe) pour sauvegarder leurs scores, avoir un profil public et une photo de profil. Les guests peuvent toujours jouer sans compte.
+
+### Authentification
+
+- **Token** : format `userId:expiresAt:hmac` signé HMAC-SHA256 avec `ADMIN_PASSWORD` comme secret
+- **Cookie** : `blindtoss_user_session` (httpOnly, 30 jours)
+- **Hash mdp** : Node.js `crypto.scrypt` (pas bcryptjs — incompatible ESM avec Next.js 16)
+- **Fichier** : `lib/userAuth.ts` — `signUserToken`, `verifyUserToken`, `hashPassword`, `comparePassword`, `getCurrentUser`
+
+### Routes API utilisateur
+
+```
+POST /api/user/register     # Créer un compte
+POST /api/user/login        # Connexion (pose blindtoss_user_session + blindtoss_admin_session si isAdmin)
+POST /api/user/logout       # Déconnexion (efface les deux cookies)
+GET  /api/user/me           # Utilisateur courant (id, username, displayName, avatarFile, isAdmin)
+PATCH /api/user/profile     # Modifier displayName et/ou mot de passe
+POST /api/user/avatar       # Uploader une photo de profil (JPG/PNG/WebP, max 5 Mo)
+```
+
+### Profils
+
+- **URL publique** : `/profile/[username]` — stats ladder, historique des 20 dernières parties
+- **Édition** : `/profile/edit` — pseudo affiché, mot de passe, photo de profil
+- **Composant avatar** : `components/UserAvatar.tsx` — carré arrondi style Vista, couleur pastel déterministe si pas de photo, reflet vitré CSS
+
+### Intégration en jeu (server.js)
+
+Au moment de la connexion Socket.IO, le cookie est lu et vérifié (synchrone). La DB est interrogée en parallèle via `displayNamePromise` (pattern non-bloquant) pour récupérer `displayName` et `avatarFile`. Ces données sont stockées dans l'objet `player` et incluses dans tous les events (`room:state`, `room:player-joined`, `chat:message`).
+
+```js
+// Pattern clé — NE PAS mettre await avant l'enregistrement des handlers
+let displayNamePromise = Promise.resolve({ displayName: null, avatarFile: null });
+if (tokenValide) {
+  displayNamePromise = prisma.user.findUnique({ select: { displayName, avatarFile } });
+}
+socket.on('room:join', async (...) => {
+  const { displayName, avatarFile } = await displayNamePromise; // await ICI seulement
+});
+```
+
+### Système admin utilisateurs
+
+- **Champ** : `User.isAdmin` (Boolean, default false)
+- **Accès back-office** : à la connexion, si `isAdmin: true` → cookie `blindtoss_admin_session` posé automatiquement
+- **Interface** : `/admin/users` — tableau des comptes avec bouton "Passer admin" / "Retirer admin"
+- **En production** : `node scripts/make_admin.js <username>` après création du compte
 
 ---
 

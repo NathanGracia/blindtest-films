@@ -29,6 +29,27 @@ function getWeekId(date = new Date()) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
+// Sauvegarder un GameResult pour un joueur avec compte
+async function saveGameResult({ userId, score, rank, totalPlayers, tracksFound, totalTracks, categories, roomCode }) {
+  if (!userId) return;
+  try {
+    await prisma.gameResult.create({
+      data: {
+        userId,
+        score,
+        rank,
+        totalPlayers,
+        tracksFound,
+        totalTracks,
+        categories: JSON.stringify(categories),
+        roomCode,
+      },
+    });
+  } catch (err) {
+    console.error('[GAME_RESULT] Erreur sauvegarde:', err);
+  }
+}
+
 // Sauvegarder le score dans le ladder (upsert)
 async function saveLadderScore(pseudo, score) {
   if (!pseudo || score <= 0) return;
@@ -456,6 +477,7 @@ async function startPublicGame(room) {
     room.players.forEach(p => {
       p.score = 0;
       p.hasFoundThisRound = false;
+      p.tracksFound = 0;
     });
 
     const currentTrack = room.tracks[room.currentTrackIndex];
@@ -535,12 +557,24 @@ async function nextTrackPublic(room) {
       room.timer = null;
     }
 
-    // NOUVEAU: Sauvegarder les scores dans le ladder
+    // Sauvegarder les scores dans le ladder + GameResult
     const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
-    for (const player of sortedPlayers) {
+    const publicCategories = [...new Set(room.tracks.map(t => t.categoryId))];
+    for (let i = 0; i < sortedPlayers.length; i++) {
+      const player = sortedPlayers[i];
       if (player.score > 0) {
         await saveLadderScore(player.pseudo, player.score);
       }
+      await saveGameResult({
+        userId: player.userId || null,
+        score: player.score,
+        rank: i + 1,
+        totalPlayers: sortedPlayers.length,
+        tracksFound: player.tracksFound || 0,
+        totalTracks: room.tracks.length,
+        categories: publicCategories,
+        roomCode: PUBLIC_ROOM_CODE,
+      });
     }
 
     if (ioInstance) {
@@ -645,6 +679,38 @@ app.prepare().then(async () => {
 
     let currentRoom = null;
     let currentPseudo = null;
+    let currentUserId = null; // null = guest
+
+    // Vérifier le token (synchrone) et lancer la DB en parallèle (sans bloquer)
+    const rawCookie = socket.handshake.headers.cookie || '';
+    const match = rawCookie.match(/blindtoss_user_session=([^;]+)/);
+    let displayNamePromise = Promise.resolve({ username: null, displayName: null, avatarFile: null });
+
+    if (match) {
+      try {
+        const token = decodeURIComponent(match[1]);
+        const parts = token.split(':');
+        if (parts.length === 3) {
+          const [userIdStr, expiresAtStr, hmac] = parts;
+          const expiresAt = parseInt(expiresAtStr, 10);
+          if (Date.now() < expiresAt) {
+            const crypto = require('crypto');
+            const secret = process.env.ADMIN_PASSWORD || 'blindtoss-user-secret';
+            const expected = crypto.createHmac('sha256', secret)
+              .update(`${userIdStr}:${expiresAtStr}`)
+              .digest('hex');
+            if (hmac === expected) {
+              currentUserId = parseInt(userIdStr, 10);
+              // Charger displayName + avatarFile en parallèle — les handlers s'enregistrent immédiatement
+              displayNamePromise = prisma.user.findUnique({
+                where: { id: currentUserId },
+                select: { username: true, displayName: true, avatarFile: true },
+              }).then(u => ({ username: u?.username || null, displayName: u?.displayName || null, avatarFile: u?.avatarFile || null })).catch(() => ({ username: null, displayName: null, avatarFile: null }));
+            }
+          }
+        }
+      } catch { /* token invalide, reste guest */ }
+    }
 
     // Créer une room
     socket.on('room:create', async (pseudo, categories, maxRounds, difficulty, callback) => {
@@ -715,9 +781,11 @@ app.prepare().then(async () => {
           finalTracks = shuffleArray(filteredTracks);
         }
 
+        const { username: userUsername, displayName: userDisplayName, avatarFile: userAvatarFile } = await displayNamePromise;
+        const effectivePseudo = userDisplayName || pseudo;
         const room = {
           code,
-          players: [{ id: socket.id, pseudo, score: 0, hasFoundThisRound: false }],
+          players: [{ id: socket.id, pseudo: effectivePseudo, score: 0, hasFoundThisRound: false, userId: currentUserId, avatarFile: userAvatarFile, username: userUsername }],
           currentTrackIndex: 0,
           isPlaying: false,
           hostId: socket.id,
@@ -746,7 +814,7 @@ app.prepare().then(async () => {
     });
 
     // Rejoindre une room
-    socket.on('room:join', (code, pseudo, callback) => {
+    socket.on('room:join', async (code, pseudo, callback) => {
       const roomCode = code.toUpperCase();
       const room = rooms.get(roomCode);
 
@@ -765,18 +833,22 @@ app.prepare().then(async () => {
         return;
       }
 
+      // Utiliser le displayName si le joueur est connecté
+      const { username: userUsername, displayName: userDisplayName, avatarFile: userAvatarFile } = await displayNamePromise;
+      const requestedPseudo = userDisplayName || pseudo;
+
       // Vérifier si le pseudo existe déjà et ajouter un suffixe si nécessaire
-      let finalPseudo = pseudo;
+      let finalPseudo = requestedPseudo;
       const existingPseudos = room.players.map(p => p.pseudo.toLowerCase());
-      if (existingPseudos.includes(pseudo.toLowerCase())) {
+      if (existingPseudos.includes(requestedPseudo.toLowerCase())) {
         let suffix = 2;
-        while (existingPseudos.includes(`${pseudo.toLowerCase()}${suffix}`)) {
+        while (existingPseudos.includes(`${requestedPseudo.toLowerCase()}${suffix}`)) {
           suffix++;
         }
-        finalPseudo = `${pseudo}${suffix}`;
+        finalPseudo = `${requestedPseudo}${suffix}`;
       }
 
-      const player = { id: socket.id, pseudo: finalPseudo, score: 0, hasFoundThisRound: false };
+      const player = { id: socket.id, pseudo: finalPseudo, score: 0, hasFoundThisRound: false, userId: currentUserId, avatarFile: userAvatarFile, username: userUsername };
       room.players.push(player);
       socket.join(roomCode);
       currentRoom = roomCode;
@@ -889,6 +961,7 @@ app.prepare().then(async () => {
         room.players.forEach(p => {
           p.score = 0;
           p.hasFoundThisRound = false;
+          p.tracksFound = 0;
         });
 
         const currentTrack = room.tracks[room.currentTrackIndex];
@@ -957,12 +1030,17 @@ app.prepare().then(async () => {
       }
 
       // Créer le message
+      const currentPlayer = room.players.find(p => p.id === socket.id);
+      const currentAvatarFile = currentPlayer?.avatarFile || null;
+      const currentUsername = currentPlayer?.username || null;
       const chatMessage = {
         pseudo: currentPseudo,
         message: answer,
         isCorrect,
         playerId: socket.id,
         isFromFinder: alreadyFound,
+        avatarFile: currentAvatarFile,
+        username: currentUsername,
       };
 
       // ROUTING DES MESSAGES
@@ -974,6 +1052,8 @@ app.prepare().then(async () => {
           isCorrect: true,
           playerId: socket.id,
           isFromFinder: false,
+          avatarFile: currentAvatarFile,
+          username: currentUsername,
         };
         // Envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', foundMessage);
@@ -1001,6 +1081,7 @@ app.prepare().then(async () => {
         if (player) {
           player.score += scoreEarned;
           player.hasFoundThisRound = true;
+          player.tracksFound = (player.tracksFound || 0) + 1;
         }
 
         // Tracker les stats par catégorie
@@ -1192,7 +1273,7 @@ app.prepare().then(async () => {
   }
 
   // Passer au track suivant
-  function nextTrack(room, roomCode, io) {
+  async function nextTrack(room, roomCode, io) {
     room.currentTrackIndex++;
     room.roundFinders = new Set();
     room.players.forEach(p => p.hasFoundThisRound = false);
@@ -1200,8 +1281,28 @@ app.prepare().then(async () => {
     if (room.currentTrackIndex >= room.tracks.length) {
       // Fin de partie
       room.isPlaying = false;
+      const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+      const categories = [...new Set(room.tracks.map(t => t.categoryId))];
+      const totalTracks = room.tracks.length;
+
+      // Sauvegarder résultats pour joueurs connectés
+      for (let i = 0; i < sortedPlayers.length; i++) {
+        const p = sortedPlayers[i];
+        await saveLadderScore(p.pseudo, p.score);
+        await saveGameResult({
+          userId: p.userId || null,
+          score: p.score,
+          rank: i + 1,
+          totalPlayers: sortedPlayers.length,
+          tracksFound: p.tracksFound || 0,
+          totalTracks,
+          categories,
+          roomCode,
+        });
+      }
+
       io.to(roomCode).emit('game:end', {
-        players: room.players.sort((a, b) => b.score - a.score),
+        players: sortedPlayers,
         categoryStats: room.categoryStats,
       });
       return;

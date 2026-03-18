@@ -40,6 +40,31 @@ model Report {
   createdAt DateTime @default(now())
 }
 
+model User {
+  id           Int          @id @default(autoincrement())
+  username     String       @unique   // Login + URL (immuable, minuscules)
+  displayName  String?               // Pseudo affiché en jeu (modifiable)
+  passwordHash String
+  avatarFile   String?               // /avatars/user-1.jpg
+  isAdmin      Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  gameHistory  GameResult[]
+}
+
+model GameResult {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Int
+  rank         Int
+  totalPlayers Int
+  tracksFound  Int
+  totalTracks  Int
+  categories   String   // JSON ["films","series"]
+  roomCode     String
+  playedAt     DateTime @default(now())
+}
+
 model LadderEntry {
   id          Int      @id @default(autoincrement())
   pseudo      String                              // Normalisé en minuscules

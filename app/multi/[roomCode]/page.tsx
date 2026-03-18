@@ -11,6 +11,8 @@ import RevealImage from '@/components/RevealImage';
 import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
 import DeterminossNotif from '@/components/DeterminossNotif';
+import Link from 'next/link';
+import UserAvatar from '@/components/UserAvatar';
 import { Player, ChatMessage, RoomState, Category } from '@/types';
 
 interface TrackSuggestion {
@@ -544,10 +546,21 @@ export default function MultiGameRoom() {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
-                      </span>
-                      <span className="text-white font-semibold">{player.pseudo}</span>
+                      <div className="relative">
+                        <UserAvatar avatarFile={player.avatarFile} pseudo={player.pseudo} size={36} />
+                        {index < 3 && (
+                          <span className="absolute -bottom-1 -right-1 text-sm leading-none">
+                            {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                          </span>
+                        )}
+                      </div>
+                      {player.username ? (
+                        <Link href={`/profile/${player.username}`} className="text-white font-semibold hover:underline">
+                          {player.pseudo}
+                        </Link>
+                      ) : (
+                        <span className="text-white font-semibold">{player.pseudo}</span>
+                      )}
                     </div>
                     <span className="text-[#7fba00] font-bold text-xl">{player.score}</span>
                   </div>
@@ -893,63 +906,54 @@ export default function MultiGameRoom() {
               <div className="glass rounded-xl overflow-hidden">
                 <div
                   ref={chatRef}
-                  className="h-48 overflow-y-auto p-4 space-y-2"
+                  className="h-72 overflow-y-auto p-3 space-y-1.5"
                 >
                   {messages.length === 0 ? (
-                    <p className="text-white/40 text-center italic">
+                    <p className="text-white/40 text-center italic text-sm mt-8">
                       Les réponses apparaîtront ici...
                     </p>
                   ) : (
-                    messages.map((msg, i) => (
-                      <div
-                        key={i}
-                        className={`flex items-start gap-2 ${
-                          msg.isCorrect ? 'animate-pulse bg-green-500/10 border border-green-500/30 rounded px-2 py-1' : ''
-                        } ${
-                          msg.isFromFinder ? 'opacity-90' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <span
-                            className={`font-semibold ${
-                              msg.isFromFinder
-                                ? 'text-[#4a90d9]'
-                                : msg.playerId === myId
-                                  ? 'text-[#7ec8e3]'
-                                  : 'text-[#4a90d9]'
-                            }`}
-                          >
-                            {msg.pseudo}
-                          </span>
-                          {msg.isFromFinder && (
-                            <span className="text-[#4a90d9] text-sm" title="Message d'un gagnant">
-                              👑
-                            </span>
-                          )}
-                          <span
-                            className={`font-semibold ${
-                              msg.isFromFinder
-                                ? 'text-[#4a90d9]'
-                                : msg.playerId === myId
-                                  ? 'text-[#7ec8e3]'
-                                  : 'text-[#4a90d9]'
-                            }`}
-                          >
-                            :
-                          </span>
-                        </div>
-                        <span
-                          className={
-                            msg.isCorrect
-                              ? 'text-[#7fba00] font-bold'
-                              : 'text-white/70'
-                          }
+                    messages.map((msg, i) => {
+                      const pseudoColor = msg.isFromFinder
+                        ? 'text-[#4a90d9]'
+                        : msg.playerId === myId
+                          ? 'text-[#7ec8e3]'
+                          : 'text-[#4a90d9]';
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-start gap-2.5 ${
+                            msg.isCorrect ? 'bg-green-500/10 border border-green-500/30 rounded-lg px-2 py-1.5' : 'px-1 py-0.5'
+                          } ${msg.isFromFinder ? 'opacity-90' : ''}`}
                         >
-                          {msg.message}
-                        </span>
-                        {msg.isCorrect && <span className="text-[#7fba00]">✓</span>}
-                      </div>
-                    ))
+                          <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={28} className="mt-0.5" />
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {msg.username ? (
+                                <Link href={`/profile/${msg.username}`} className={`font-semibold text-sm hover:underline ${pseudoColor}`}>
+                                  {msg.pseudo}
+                                </Link>
+                              ) : (
+                                <span className={`font-semibold text-sm ${pseudoColor}`}>{msg.pseudo}</span>
+                              )}
+                              {msg.isFromFinder && (
+                                <span className="text-xs" title="A déjà trouvé">👑</span>
+                              )}
+                            </div>
+                            <span
+                              className={`text-sm leading-snug ${
+                                msg.isCorrect
+                                  ? 'text-[#7fba00] font-bold'
+                                  : 'text-white/80'
+                              }`}
+                            >
+                              {msg.message}
+                              {msg.isCorrect && <span className="ml-1">✓</span>}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
 

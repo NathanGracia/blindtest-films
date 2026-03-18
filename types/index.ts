@@ -37,6 +37,8 @@ export interface Player {
   pseudo: string;
   score: number;
   hasFoundThisRound?: boolean;
+  avatarFile?: string | null;
+  username?: string | null;
 }
 
 export interface RoomState {
@@ -67,6 +69,8 @@ export interface ChatMessage {
   playerId: string;
   isFromFinder?: boolean;
   isHint?: boolean;
+  avatarFile?: string | null;
+  username?: string | null;
 }
 
 // Types Admin

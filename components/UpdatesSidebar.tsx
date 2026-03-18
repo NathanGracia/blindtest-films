@@ -1,7 +1,19 @@
 export default function UpdatesSidebar() {
   const updates = [
     {
-      date: '14 mars 2025',
+      date: '18 mars 2026',
+      badge: '✨ Nouveau',
+      badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
+      items: [
+        'Comptes utilisateurs : inscription, connexion, profil public',
+        'Photo de profil personnalisée sur tout le site',
+        'Historique de tes parties sur ton profil',
+        'Pseudo de compte utilisé automatiquement en jeu',
+        'Photos de profil visibles dans le chat et le classement',
+      ],
+    },
+    {
+      date: '14 mars 2026',
       badge: '✨ Nouveau',
       badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
       items: [

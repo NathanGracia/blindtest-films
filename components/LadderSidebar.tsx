@@ -1,12 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import UserAvatar from '@/components/UserAvatar';
 
 interface LadderEntry {
   rank: number;
   pseudo: string;
   bestScore: number;
   gamesPlayed: number;
+  avatarFile?: string | null;
+  username?: string | null;
 }
 
 export default function LadderSidebar() {
@@ -66,21 +70,32 @@ export default function LadderSidebar() {
                 ${entry.rank > 3 ? 'bg-white/5' : ''}
               `}
             >
-              {/* Rang */}
-              <div className="flex-shrink-0 w-8 text-center">
-                {entry.rank === 1 && <span className="text-2xl">🥇</span>}
-                {entry.rank === 2 && <span className="text-2xl">🥈</span>}
-                {entry.rank === 3 && <span className="text-2xl">🥉</span>}
-                {entry.rank > 3 && (
-                  <span className="text-white/40 font-mono text-sm">#{entry.rank}</span>
-                )}
+              {/* Avatar + badge rang */}
+              <div className="relative flex-shrink-0">
+                <UserAvatar avatarFile={entry.avatarFile} pseudo={entry.pseudo} size={36} />
+                <div className="absolute -bottom-1 -right-1 text-sm leading-none">
+                  {entry.rank === 1 && '🥇'}
+                  {entry.rank === 2 && '🥈'}
+                  {entry.rank === 3 && '🥉'}
+                  {entry.rank > 3 && (
+                    <span className="bg-black/60 text-white/50 font-mono text-[10px] px-1 rounded">
+                      #{entry.rank}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Pseudo */}
               <div className="flex-1 min-w-0">
-                <div className={`font-semibold truncate ${entry.rank === 1 ? 'text-yellow-300 text-glow' : 'text-white'}`}>
-                  {entry.pseudo}
-                </div>
+                {entry.username ? (
+                  <Link href={`/profile/${entry.username}`} className={`font-semibold truncate block hover:underline ${entry.rank === 1 ? 'text-yellow-300 text-glow' : 'text-white'}`}>
+                    {entry.pseudo}
+                  </Link>
+                ) : (
+                  <div className={`font-semibold truncate ${entry.rank === 1 ? 'text-yellow-300 text-glow' : 'text-white'}`}>
+                    {entry.pseudo}
+                  </div>
+                )}
                 <div className="text-white/40 text-xs">
                   {entry.gamesPlayed} partie{entry.gamesPlayed > 1 ? 's' : ''}
                 </div>
