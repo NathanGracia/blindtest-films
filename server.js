@@ -738,6 +738,18 @@ app.prepare().then(async () => {
       }
 
       try {
+        // Bloquer les guests qui usurpent le pseudo d'un compte existant
+        if (!currentUserId) {
+          const taken = await prisma.user.findUnique({
+            where: { username: pseudo.trim().toLowerCase() },
+            select: { id: true },
+          });
+          if (taken) {
+            callback(null, 'Ce pseudo appartient à un compte enregistré. Connectez-vous ou choisissez un autre pseudo.');
+            return;
+          }
+        }
+
         let code = generateRoomCode();
         while (rooms.has(code)) {
           code = generateRoomCode();
@@ -836,6 +848,18 @@ app.prepare().then(async () => {
       // Utiliser le displayName si le joueur est connecté
       const { username: userUsername, displayName: userDisplayName, avatarFile: userAvatarFile } = await displayNamePromise;
       const requestedPseudo = userDisplayName || pseudo;
+
+      // Bloquer les guests qui usurpent le pseudo d'un compte existant
+      if (!currentUserId) {
+        const taken = await prisma.user.findUnique({
+          where: { username: pseudo.trim().toLowerCase() },
+          select: { id: true },
+        });
+        if (taken) {
+          callback(false, 'Ce pseudo appartient à un compte enregistré. Connectez-vous ou choisissez un autre pseudo.');
+          return;
+        }
+      }
 
       // Vérifier si le pseudo existe déjà et ajouter un suffixe si nécessaire
       let finalPseudo = requestedPseudo;
