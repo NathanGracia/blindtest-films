@@ -6,10 +6,9 @@ export default function UpdatesSidebar() {
       badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
       items: [
         'Comptes utilisateurs : inscription, connexion, profil public',
-        'Photo de profil personnalisée sur tout le site',
-        'Historique de tes parties sur ton profil',
-        'Pseudo de compte utilisé automatiquement en jeu',
-        'Photos de profil visibles dans le chat et le classement',
+        'Photo de profil visible dans le chat et le classement',
+        'Historique de tes parties ranked sur ton profil',
+        'Crée un compte avec ton ancien pseudo pour récupérer ton score 👌',
       ],
     },
     {
