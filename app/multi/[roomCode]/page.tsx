@@ -23,6 +23,12 @@ interface TrackSuggestion {
   categoryId: string;
 }
 
+interface Emote {
+  id: number;
+  code: string;
+  imageFile: string | null;
+}
+
 const ICONS: Record<string, string> = {
   film: '🎬',
   tv: '📺',
@@ -73,6 +79,13 @@ export default function MultiGameRoom() {
   const [remainingLives, setRemainingLives] = useState(3);
   const [gameStartKey, setGameStartKey] = useState(0);
 
+  // Emotes
+  const [emotes, setEmotes] = useState<Emote[]>([]);
+  const [showEmoteDropdown, setShowEmoteDropdown] = useState(false);
+  const [filteredEmotes, setFilteredEmotes] = useState<Emote[]>([]);
+  const [selectedEmoteIndex, setSelectedEmoteIndex] = useState(-1);
+  const emoteDropdownRef = useRef<HTMLDivElement>(null);
+
   // Historique des tracks joués + notes
   const [playedTracks, setPlayedTracks] = useState<PlayedTrack[]>([]);
   const [trackNotes, setTrackNotes] = useState<Record<number, string>>({});
@@ -111,8 +124,15 @@ export default function MultiGameRoom() {
         }
       } catch {}
     };
+    const loadEmotes = async () => {
+      try {
+        const res = await fetch('/api/emotes');
+        if (res.ok) setEmotes(await res.json());
+      } catch {}
+    };
     loadCategories();
     checkUser();
+    loadEmotes();
   }, []);
 
   // Fonction pour charger les réponses disponibles
@@ -484,6 +504,13 @@ export default function MultiGameRoom() {
     }
   }, [selectedIndex]);
 
+  useEffect(() => {
+    if (selectedEmoteIndex >= 0 && emoteDropdownRef.current) {
+      const selected = emoteDropdownRef.current.children[selectedEmoteIndex] as HTMLElement;
+      selected?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedEmoteIndex]);
+
   const handleLeave = () => {
     // Inform the server we leave, clear stored pseudo and go back to the lobby
     socketRef.current.emit('room:leave');
@@ -491,8 +518,44 @@ export default function MultiGameRoom() {
     router.push('/');
   };
 
+  const selectEmote = (emote: Emote) => {
+    const newInput = input.replace(/:([a-zA-Z0-9_]*)$/, `:${emote.code}: `);
+    setInput(newInput);
+    setShowEmoteDropdown(false);
+    setSelectedEmoteIndex(-1);
+    inputRef.current?.focus();
+  };
+
+  const renderMessageText = (text: string) => {
+    if (emotes.length === 0) return text;
+    const parts = text.split(/(:[a-zA-Z0-9_]+:)/g);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) => {
+      const match = part.match(/^:([a-zA-Z0-9_]+):$/);
+      if (!match) return part;
+      const emote = emotes.find(e => e.code === match[1]);
+      if (!emote) return part;
+      if (emote.imageFile) {
+        return <img key={i} src={emote.imageFile} alt={`:${emote.code}:`} title={`:${emote.code}:`} className="inline-block w-6 h-6 object-contain align-middle mx-0.5" />;
+      }
+      return part;
+    });
+  };
+
   const handleInputChange = (value: string) => {
     setInput(value);
+
+    const emoteMatch = value.match(/:([a-zA-Z0-9_]*)$/);
+    if (emoteMatch && emotes.length > 0) {
+      const query = emoteMatch[1].toLowerCase();
+      const matches = emotes.filter(e => e.imageFile && e.code.startsWith(query)).slice(0, 10);
+      setFilteredEmotes(matches);
+      setShowEmoteDropdown(matches.length > 0);
+      setSelectedEmoteIndex(matches.length > 0 ? 0 : -1);
+      setShowDropdown(false);
+      return;
+    }
+    setShowEmoteDropdown(false);
 
     if (!allAnswers || value.trim().length < 2 || !currentCategoryId || remainingLives === 0) {
       setShowDropdown(false);
@@ -543,6 +606,29 @@ export default function MultiGameRoom() {
         e.preventDefault();
         allNotes[allNotes.length - 1].focus();
         return;
+      }
+    }
+
+    // Dropdown emotes
+    if (showEmoteDropdown && filteredEmotes.length > 0) {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedEmoteIndex(prev => prev < filteredEmotes.length - 1 ? prev + 1 : prev);
+          return;
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedEmoteIndex(prev => prev > 0 ? prev - 1 : 0);
+          return;
+        case 'Tab':
+        case 'Enter':
+          e.preventDefault();
+          if (selectedEmoteIndex >= 0) selectEmote(filteredEmotes[selectedEmoteIndex]);
+          return;
+        case 'Escape':
+          e.preventDefault();
+          setShowEmoteDropdown(false);
+          return;
       }
     }
 
@@ -1031,35 +1117,32 @@ export default function MultiGameRoom() {
                       return (
                         <div
                           key={i}
-                          className={`flex items-start gap-2.5 ${
-                            msg.isCorrect ? 'bg-green-500/10 border border-green-500/30 rounded-lg px-2 py-1.5' : 'px-1 py-0.5'
+                          className={`flex items-center gap-2 ${
+                            msg.isCorrect ? 'bg-green-500/10 border border-green-500/30 rounded-lg px-2 py-1' : 'px-1 py-0.5'
                           } ${msg.isFromFinder ? 'opacity-90' : ''}`}
                         >
-                          <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={28} className="mt-0.5" />
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {msg.username ? (
-                                <Link href={`/profile/${msg.username}`} className={`font-semibold text-sm hover:underline ${pseudoColor}`}>
-                                  {msg.pseudo}
-                                </Link>
-                              ) : (
-                                <span className={`font-semibold text-sm ${pseudoColor}`}>{msg.pseudo}</span>
-                              )}
-                              {msg.isFromFinder && (
-                                <span className="text-xs" title="A déjà trouvé">👑</span>
-                              )}
-                            </div>
-                            <span
-                              className={`text-sm leading-snug ${
-                                msg.isCorrect
-                                  ? 'text-[#7fba00] font-bold'
-                                  : 'text-white/80'
-                              }`}
-                            >
-                              {msg.message}
+                          {msg.username ? (
+                            <Link href={`/profile/${msg.username}`} className="shrink-0">
+                              <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={32} />
+                            </Link>
+                          ) : (
+                            <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={32} className="shrink-0" />
+                          )}
+                          <p className="text-base leading-snug min-w-0 break-words" style={{ lineHeight: '32px' }}>
+                            {msg.username ? (
+                              <Link href={`/profile/${msg.username}`} className={`font-semibold hover:underline ${pseudoColor}`}>
+                                {msg.pseudo}
+                              </Link>
+                            ) : (
+                              <span className={`font-semibold ${pseudoColor}`}>{msg.pseudo}</span>
+                            )}
+                            {msg.isFromFinder && <span className="text-xs mx-0.5" title="A déjà trouvé">👑</span>}
+                            <span className="text-white/40 mx-1">:</span>
+                            <span className={msg.isCorrect ? 'text-[#7fba00] font-bold' : 'text-white/80'}>
+                              {renderMessageText(msg.message)}
                               {msg.isCorrect && <span className="ml-1">✓</span>}
                             </span>
-                          </div>
+                          </p>
                         </div>
                       );
                     })
@@ -1067,6 +1150,32 @@ export default function MultiGameRoom() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="relative flex border-t border-white/20">
+                  {showEmoteDropdown && filteredEmotes.length > 0 && (
+                    <div
+                      ref={emoteDropdownRef}
+                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+                    >
+                      {filteredEmotes.map((emote, index) => (
+                        <div
+                          key={emote.id}
+                          onClick={() => selectEmote(emote)}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
+                            index === selectedEmoteIndex
+                              ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white'
+                              : 'hover:bg-white/10 text-white/90'
+                          }`}
+                        >
+                          <span className="w-7 h-7 flex items-center justify-center shrink-0">
+                            {emote.imageFile
+                              ? <img src={emote.imageFile} alt={emote.code} className="w-6 h-6 object-contain" />
+                              : <span className="text-white/30 text-xs">?</span>
+                            }
+                          </span>
+                          <span className="text-sm font-mono text-white/70">:{emote.code}:</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {showDropdown && filteredSuggestions.length > 0 && (
                     <div
                       ref={dropdownRef}

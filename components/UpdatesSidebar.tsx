@@ -1,6 +1,17 @@
 export default function UpdatesSidebar() {
   const updates = [
     {
+      date: '19 mars 2026',
+      badge: '✨ Nouveau',
+      badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
+      items: [
+        'Emotes dans le chat : tape :code: pour insérer une image/GIF',
+        'Signalement accessible depuis l\'historique des tracks joués',
+        'Clic sur la PP ou le pseudo en jeu pour voir le profil',
+        'Mute/unmute au clic sur le volume, slider au hover',
+      ],
+    },
+    {
       date: '18 mars 2026',
       badge: '✨ Nouveau',
       badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',

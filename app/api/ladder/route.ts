@@ -14,6 +14,7 @@ export async function GET() {
     const users = await prisma.user.findMany({
       where: { OR: [
         { username: { in: pseudos } },
+        { username: { in: pseudos.map(p => p.toLowerCase()) } },
         { displayName: { in: pseudos } },
       ]},
       select: { username: true, displayName: true, avatarFile: true },
@@ -21,10 +22,13 @@ export async function GET() {
 
     return NextResponse.json({
       entries: entries.map((entry, index) => {
-        const user = users.find(u => (u.displayName || u.username) === entry.pseudo || u.username === entry.pseudo);
+        const user = users.find(u =>
+          u.username?.toLowerCase() === entry.pseudo.toLowerCase() ||
+          u.displayName?.toLowerCase() === entry.pseudo.toLowerCase()
+        );
         return {
           rank: index + 1,
-          pseudo: entry.pseudo,
+          pseudo: user?.displayName || user?.username || entry.pseudo,
           bestScore: entry.bestScore,
           gamesPlayed: entry.gamesPlayed,
           avatarFile: user?.avatarFile ?? null,

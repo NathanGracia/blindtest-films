@@ -79,6 +79,13 @@ model GameResult {
   playedAt     DateTime @default(now())
 }
 
+model Emote {
+  id        Int     @id @default(autoincrement())
+  code      String  @unique  // shortcode sans les : (ex: "gg", "rip", "fire")
+  emoji     String?          // fallback texte/emoji si pas d'image
+  imageFile String?          // /emotes/fire.gif
+}
+
 model LadderEntry {
   id          Int      @id @default(autoincrement())
   pseudo      String                              // Normalisé en minuscules
