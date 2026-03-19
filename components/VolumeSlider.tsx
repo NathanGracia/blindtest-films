@@ -7,47 +7,70 @@ interface VolumeSliderProps {
 }
 
 export default function VolumeSlider({ onVolumeChange }: VolumeSliderProps) {
-  const [volume, setVolume] = useState(0.7); // Volume par défaut à 70%
+  const [volume, setVolume] = useState(0.7);
+  const [prevVolume, setPrevVolume] = useState(0.7);
   const [isHovered, setIsHovered] = useState(false);
   const [showSlider, setShowSlider] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const showTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Charger le volume depuis localStorage au montage
   useEffect(() => {
     const savedVolume = localStorage.getItem('blindtoss_volume');
     if (savedVolume !== null) {
       const vol = parseFloat(savedVolume);
       if (!isNaN(vol) && vol >= 0 && vol <= 1) {
         setVolume(vol);
+        if (vol > 0) setPrevVolume(vol);
         onVolumeChange(vol);
       }
     } else {
-      onVolumeChange(0.7); // Volume par défaut
+      onVolumeChange(0.7);
     }
   }, [onVolumeChange]);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
+    if (newVolume > 0) setPrevVolume(newVolume);
     localStorage.setItem('blindtoss_volume', newVolume.toString());
     onVolumeChange(newVolume);
   };
 
+  const handleMuteToggle = () => {
+    if (volume === 0) {
+      const restore = prevVolume > 0 ? prevVolume : 0.7;
+      setVolume(restore);
+      localStorage.setItem('blindtoss_volume', restore.toString());
+      onVolumeChange(restore);
+    } else {
+      setPrevVolume(volume);
+      setVolume(0);
+      localStorage.setItem('blindtoss_volume', '0');
+      onVolumeChange(0);
+    }
+  };
+
   const handleMouseEnter = () => {
     setIsHovered(true);
-    setShowSlider(true);
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
+    showTimeoutRef.current = setTimeout(() => {
+      setShowSlider(true);
+    }, 500);
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    if (showTimeoutRef.current) {
+      clearTimeout(showTimeoutRef.current);
+      showTimeoutRef.current = null;
+    }
     hideTimeoutRef.current = setTimeout(() => {
       setShowSlider(false);
-    }, 500); // Cache après 500ms
+    }, 300);
   };
 
   const getVolumeIcon = () => {
@@ -64,7 +87,7 @@ export default function VolumeSlider({ onVolumeChange }: VolumeSliderProps) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Slider - apparaît au hover */}
+      {/* Slider - apparaît après hover prolongé */}
       <div
         className={`transition-all duration-200 ${
           showSlider ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'
@@ -109,10 +132,11 @@ export default function VolumeSlider({ onVolumeChange }: VolumeSliderProps) {
 
       {/* Bouton volume - toujours visible */}
       <button
+        onClick={handleMuteToggle}
         className={`glass rounded-lg p-1.5 transition-all duration-200 ${
           isHovered ? 'glow-blue scale-110' : ''
         }`}
-        title={`Volume: ${Math.round(volume * 100)}%`}
+        title={volume === 0 ? 'Réactiver le son' : 'Muet'}
       >
         <span className="text-base">{getVolumeIcon()}</span>
       </button>
