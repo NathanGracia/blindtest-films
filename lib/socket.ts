@@ -7,8 +7,7 @@ export const getSocket = (): Socket => {
     console.log('[socket] initializing client');
     socket = io({
       autoConnect: true,
-      // Prefer WebSocket transport in production to avoid xhr polling errors behind some proxies
-      transports: ['websocket']
+      transports: ['polling', 'websocket'],
     });
 
     socket.on('connect', () => {

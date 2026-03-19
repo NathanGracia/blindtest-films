@@ -539,6 +539,16 @@ export default function MultiGameRoom() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Shift+Tab depuis l'input : focus la dernière note de l'historique
+    if (e.key === 'Tab' && e.shiftKey) {
+      const allNotes = document.querySelectorAll<HTMLTextAreaElement>('[data-history-note]');
+      if (allNotes.length > 0) {
+        e.preventDefault();
+        allNotes[allNotes.length - 1].focus();
+        return;
+      }
+    }
+
     if (!showDropdown || filteredSuggestions.length === 0) return;
 
     switch (e.key) {
@@ -838,6 +848,7 @@ export default function MultiGameRoom() {
               isLoggedIn={isLoggedIn}
               onNoteChange={handleNoteChange}
               onNoteSave={handleNoteSave}
+              onFocusAnswerInput={() => inputRef.current?.focus()}
             />
           </div>
 
@@ -964,29 +975,29 @@ export default function MultiGameRoom() {
                 style={{ gridArea: '1 / 1' }}
                 className={`flex flex-col justify-center${!showResult ? ' invisible pointer-events-none' : ''}`}
               >
-                <div className={`glass rounded-xl p-6 text-center ${roundFinders.length > 0 ? 'glow-green' : ''}`}>
+                <div className={`glass rounded-xl p-4 text-center ${roundFinders.length > 0 ? 'glow-green' : ''}`}>
                   {roundFinders.length > 0 ? (
                     <>
-                      <p className="text-[#7fba00] text-xl font-semibold">
+                      <p className="text-[#7fba00] text-lg font-semibold">
                         {roundFinders.length === 1
                           ? `✓ ${roundFinders[0].pseudo} a trouvé!`
                           : `✓ ${roundFinders.length} joueurs ont trouvé!`}
                       </p>
                       {roundFinders.length > 1 && (
-                        <p className="text-white/60 text-sm mt-1">
+                        <p className="text-white/60 text-sm mt-0.5">
                           {roundFinders.map(f => f.pseudo).join(', ')}
                         </p>
                       )}
                     </>
                   ) : (
-                    <p className="text-red-400 text-xl font-semibold">
+                    <p className="text-red-400 text-lg font-semibold">
                       ✗ Personne n&apos;a trouvé!
                     </p>
                   )}
 
                   {/* Zone image — toujours réservée pour éviter les sauts */}
-                  <div className="my-4 flex justify-center">
-                    <div style={{ width: '12rem', aspectRatio: '2/3', position: 'relative' }}>
+                  <div className="my-3 flex justify-center">
+                    <div style={{ width: '7rem', aspectRatio: '2/3', position: 'relative' }}>
                       {resultImage && (
                         <RevealImage src={resultImage} alt={resultTitle} className="w-full h-full object-cover rounded-lg" />
                       )}
@@ -994,9 +1005,9 @@ export default function MultiGameRoom() {
                   </div>
 
                   {/* Titre — espace toujours réservé */}
-                  <p className="text-3xl font-bold text-white mt-3 text-glow min-h-[2.5rem]">{resultTitle}</p>
-                  <p className="text-xl text-white/70 mt-1 min-h-[1.75rem]">{resultTitleVF ? `(${resultTitleVF})` : ''}</p>
-                  <div className="mt-2 min-h-[2rem]">
+                  <p className="text-2xl font-bold text-white mt-2 text-glow min-h-[2rem]">{resultTitle}</p>
+                  <p className="text-base text-white/70 mt-0.5 min-h-[1.5rem]">{resultTitleVF ? `(${resultTitleVF})` : ''}</p>
+                  <div className="mt-1.5 min-h-[1.75rem]">
                     {resultTrackId && <ReportButton trackId={resultTrackId} />}
                   </div>
                 </div>
@@ -1060,7 +1071,38 @@ export default function MultiGameRoom() {
                   )}
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex border-t border-white/20">
+                <form onSubmit={handleSubmit} className="relative flex border-t border-white/20">
+                  {showDropdown && filteredSuggestions.length > 0 && (
+                    <div
+                      ref={dropdownRef}
+                      id="autocomplete-dropdown"
+                      role="listbox"
+                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+                    >
+                      {filteredSuggestions.map((suggestion, index) => {
+                        const displayText = suggestion.titleVF
+                          ? `${suggestion.title} - ${suggestion.titleVF}`
+                          : suggestion.title;
+                        return (
+                          <div
+                            key={index}
+                            role="option"
+                            aria-selected={index === selectedIndex}
+                            onClick={() => selectSuggestion(suggestion)}
+                            className={`px-4 py-3 cursor-pointer transition-colors ${
+                              index === selectedIndex
+                                ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white font-semibold'
+                                : index === 0 && selectedIndex === -1
+                                  ? 'bg-[#4a90d9]/20 border-l-2 border-[#4a90d9]/50 text-white'
+                                  : 'hover:bg-white/10 text-white/90'
+                            }`}
+                          >
+                            {displayText}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <input
                     ref={inputRef}
                     type="text"
@@ -1089,38 +1131,6 @@ export default function MultiGameRoom() {
                 </form>
               </div>
 
-              {showDropdown && filteredSuggestions.length > 0 && (
-                <div
-                  ref={dropdownRef}
-                  id="autocomplete-dropdown"
-                  role="listbox"
-                  className="absolute left-0 right-0 mt-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
-                >
-                  {filteredSuggestions.map((suggestion, index) => {
-                    const displayText = suggestion.titleVF
-                      ? `${suggestion.title} - ${suggestion.titleVF}`
-                      : suggestion.title;
-
-                    return (
-                      <div
-                        key={index}
-                        role="option"
-                        aria-selected={index === selectedIndex}
-                        onClick={() => selectSuggestion(suggestion)}
-                        className={`px-4 py-3 cursor-pointer transition-colors ${
-                          index === selectedIndex
-                            ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white font-semibold'
-                            : index === 0 && selectedIndex === -1
-                              ? 'bg-[#4a90d9]/20 border-l-2 border-[#4a90d9]/50 text-white'
-                              : 'hover:bg-white/10 text-white/90'
-                        }`}
-                      >
-                        {displayText}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
               {/* Message hint en bas */}
               {hintMessage && (

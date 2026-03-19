@@ -194,6 +194,7 @@ export default function AudioPlayer({ trackId, isPlaying, startTime = 0, volume 
       {hasError && (
         <div className="text-center glass rounded-lg px-4 py-2">
           <p className="text-white/50 text-sm">Chargement en cours...</p>
+          <p className="text-white/30 text-xs mt-1">Si le problème persiste, vérifiez que votre navigateur autorise la lecture automatique.</p>
         </div>
       )}
 

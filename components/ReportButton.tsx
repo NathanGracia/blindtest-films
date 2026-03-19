@@ -5,9 +5,10 @@ import { useState, useEffect } from 'react';
 interface ReportButtonProps {
   trackId: number;
   label?: string;
+  onAfterSubmit?: () => void;
 }
 
-export default function ReportButton({ trackId, label }: ReportButtonProps) {
+export default function ReportButton({ trackId, label, onAfterSubmit }: ReportButtonProps) {
   const [isReported, setIsReported] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +42,7 @@ export default function ReportButton({ trackId, label }: ReportButtonProps) {
       if (res.ok) {
         setIsReported(true);
         setIsOpen(false);
+        onAfterSubmit?.();
         try {
           const reportedTracks = sessionStorage.getItem('blindtoss_reported_tracks');
           const reported = reportedTracks ? JSON.parse(reportedTracks) : [];
@@ -96,7 +98,7 @@ export default function ReportButton({ trackId, label }: ReportButtonProps) {
     <button
       onClick={() => setIsOpen(true)}
       className="text-xs px-2 py-1 rounded transition-all text-white/50 hover:text-red-400 hover:bg-red-400/10"
-      title="Signaler un problème avec cette musique"
+      title="Signaler · Signaler la précédente"
     >
       ⚠ {label || 'Signaler'}
     </button>

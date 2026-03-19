@@ -19,6 +19,7 @@ interface Props {
   isLoggedIn: boolean;
   onNoteChange: (trackId: number, note: string) => void;
   onNoteSave: (trackId: number, note: string) => void;
+  onFocusAnswerInput?: () => void;
 }
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string }> = {
@@ -27,59 +28,59 @@ const DIFFICULTY_CONFIG: Record<string, { label: string; color: string }> = {
   hard:   { label: 'Difficile', color: '#e8445a' },
 };
 
-function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSave }: {
+function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSave, noteIndex, onFocusAnswerInput }: {
   track: PlayedTrack;
   note: string;
   saveStatus?: 'saving' | 'saved';
   isLoggedIn: boolean;
   onNoteChange: (note: string) => void;
   onNoteSave: (note: string) => void;
+  noteIndex: number;
+  onFocusAnswerInput?: () => void;
 }) {
   const diff = track.difficulty ? DIFFICULTY_CONFIG[track.difficulty] : null;
   const accentColor = track.gotIt ? '#7fba00' : '#e8445a';
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+
+    const allNotes = Array.from(document.querySelectorAll<HTMLTextAreaElement>('[data-history-note]'));
+    if (e.shiftKey) {
+      if (noteIndex > 0) {
+        allNotes[noteIndex - 1]?.focus();
+      } else {
+        onFocusAnswerInput?.();
+      }
+    } else {
+      if (noteIndex < allNotes.length - 1) {
+        allNotes[noteIndex + 1]?.focus();
+      } else {
+        onFocusAnswerInput?.();
+      }
+    }
+  };
+
   return (
     <div
       className="rounded-xl overflow-hidden flex flex-col relative"
-      style={{
-        boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-        minHeight: 240,
-      }}
+      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.3)', minHeight: 240 }}
     >
-      {/* Image full-bleed en fond */}
       {track.imageFile ? (
-        <img
-          src={track.imageFile}
-          alt={track.title}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        <img src={track.imageFile} alt={track.title} className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-white/5 flex items-center justify-center">
           <span className="text-4xl opacity-20">🎬</span>
         </div>
       )}
 
-      {/* Barre colorée fine en haut */}
-      <div
-        className="relative z-10 shrink-0"
-        style={{
-          height: 3,
-          background: `linear-gradient(90deg, ${accentColor}ee, ${accentColor}44)`,
-        }}
-      />
-
-      {/* Spacer transparent — zone image visible */}
+      <div className="relative z-10 shrink-0" style={{ height: 3, background: `linear-gradient(90deg, ${accentColor}ee, ${accentColor}44)` }} />
       <div className="flex-1 relative z-10" style={{ minHeight: 110 }} />
 
-      {/* Zone texte avec glassmorphisme */}
       <div
         className="relative z-10 p-3 flex flex-col gap-2"
-        style={{
-          background: 'linear-gradient(180deg, rgba(0,15,20,0.55) 0%, rgba(0,10,15,0.82) 100%)',
-          backdropFilter: 'blur(8px)',
-        }}
+        style={{ background: 'linear-gradient(180deg, rgba(0,15,20,0.55) 0%, rgba(0,10,15,0.82) 100%)', backdropFilter: 'blur(8px)' }}
       >
-        {/* Titre + difficulté */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-white text-xs font-semibold leading-tight line-clamp-2">{track.title}</p>
@@ -97,19 +98,18 @@ function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSa
           )}
         </div>
 
-        {/* Note */}
         {isLoggedIn ? (
           <>
             <textarea
+              data-history-note
               value={note}
-              onChange={(e) => { onNoteChange(e.target.value.slice(0, 100)); }}
+              onChange={(e) => onNoteChange(e.target.value.slice(0, 100))}
               onBlur={(e) => onNoteSave(e.target.value)}
-              placeholder="Trigger, indice..."
+              onKeyDown={handleKeyDown}
+              placeholder="Notes personnelles"
+              autoComplete="off"
               className="w-full text-xs px-2 py-1.5 rounded-lg resize-none text-white placeholder-white/25 focus:outline-none transition-colors leading-snug"
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.12)',
-              }}
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
               rows={2}
             />
             <div className="flex items-center justify-between">
@@ -126,7 +126,7 @@ function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSa
   );
 }
 
-export default function TrackHistoryPanel({ tracks, notes, noteSaveStatus, isLoggedIn, onNoteChange, onNoteSave }: Props) {
+export default function TrackHistoryPanel({ tracks, notes, noteSaveStatus, isLoggedIn, onNoteChange, onNoteSave, onFocusAnswerInput }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -147,13 +147,9 @@ export default function TrackHistoryPanel({ tracks, notes, noteSaveStatus, isLog
   return (
     <div className="glass rounded-xl p-4 flex flex-col gap-3 h-full">
       <div className="shrink-0 flex flex-col gap-1">
-        <p className="text-[#7ec8e3] text-sm font-semibold">
-          Historique ({tracks.length})
-        </p>
+        <p className="text-[#7ec8e3] text-sm font-semibold">Historique ({tracks.length})</p>
         {!isLoggedIn && (
-          <p className="text-white/30 text-xs italic">
-            Connectez-vous pour enregistrer des notes
-          </p>
+          <p className="text-white/30 text-xs italic">Connectez-vous pour enregistrer des notes</p>
         )}
       </div>
       <div
@@ -161,7 +157,7 @@ export default function TrackHistoryPanel({ tracks, notes, noteSaveStatus, isLog
         className="flex flex-col gap-4 overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: 'none' }}
       >
-        {tracks.map((track) => (
+        {tracks.map((track, index) => (
           <TrackCard
             key={track.trackId}
             track={track}
@@ -170,6 +166,8 @@ export default function TrackHistoryPanel({ tracks, notes, noteSaveStatus, isLog
             isLoggedIn={isLoggedIn}
             onNoteChange={(note) => onNoteChange(track.trackId, note)}
             onNoteSave={(note) => onNoteSave(track.trackId, note)}
+            noteIndex={index}
+            onFocusAnswerInput={onFocusAnswerInput}
           />
         ))}
       </div>
