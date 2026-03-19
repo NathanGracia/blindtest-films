@@ -69,6 +69,10 @@ export default function ReportButton({ trackId, label, onAfterSubmit }: ReportBu
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, 200))}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.stopPropagation(); setIsOpen(false); setMessage(''); }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReport(); }
+          }}
           placeholder="Décris le problème (optionnel)..."
           className="input-aero w-full px-3 py-2 text-white rounded-lg text-xs resize-none"
           rows={2}
@@ -98,7 +102,6 @@ export default function ReportButton({ trackId, label, onAfterSubmit }: ReportBu
     <button
       onClick={() => setIsOpen(true)}
       className="text-xs px-2 py-1 rounded transition-all text-white/50 hover:text-red-400 hover:bg-red-400/10"
-      title="Signaler · Signaler la précédente"
     >
       ⚠ {label || 'Signaler'}
     </button>

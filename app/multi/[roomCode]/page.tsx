@@ -47,7 +47,6 @@ export default function MultiGameRoom() {
   const [resultTitleVF, setResultTitleVF] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [resultTrackId, setResultTrackId] = useState<number | null>(null);
-  const [previousTrackId, setPreviousTrackId] = useState<number | null>(null);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [winnerPseudo, setWinnerPseudo] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
@@ -262,6 +261,7 @@ export default function MultiGameRoom() {
       if (data.trackIndex === 0) {
         setGameStartKey((k) => k + 1);
         setPlayedTracks([]);
+        try { sessionStorage.removeItem('blindtoss_reported_tracks'); } catch { /* ignore */ }
       }
       // Flush les notes en attente avant le prochain round
       Object.entries(noteDebounceRef.current).forEach(([trackIdStr, timer]) => {
@@ -275,7 +275,6 @@ export default function MultiGameRoom() {
       setIsFinished(false);
       setCurrentCategoryId(data.categoryId || null);
       setCurrentDifficulty(data.difficulty || null);
-      setPreviousTrackId(null);
       // Reset états Skribbl
       setHasFoundThisRound(false);
       setMyScoreThisRound(null);
@@ -364,10 +363,8 @@ export default function MultiGameRoom() {
       // Arrêter la musique actuelle avant de passer à la suivante
       setIsPlaying(false);
 
-      // Sauvegarder l'ID de la track actuelle avant de changer
       setRoom((prev) => {
         if (!prev) return prev;
-        setPreviousTrackId(prev.currentTrack?.trackId || null);
         return {
           ...prev,
           currentTrackIndex: data.trackIndex,
@@ -406,7 +403,6 @@ export default function MultiGameRoom() {
       setCategoryStats(data.categoryStats || {});
       setIsPlaying(false);
       setShowResult(false);
-      setPreviousTrackId(null);
     });
 
     // Countdown de la room publique
@@ -479,6 +475,7 @@ export default function MultiGameRoom() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
 
   useEffect(() => {
     if (selectedIndex >= 0 && dropdownRef.current) {
@@ -868,8 +865,6 @@ export default function MultiGameRoom() {
             <Timer
               timeRemaining={timeRemaining}
               totalTime={room.currentTrack?.timeLimit || 30}
-              trackId={!showResult ? room.currentTrack?.trackId : undefined}
-              previousTrackId={!showResult ? previousTrackId || undefined : undefined}
             />
 
             {/* Zone alternante jeu/reveal — grid overlay pour hauteur stable */}

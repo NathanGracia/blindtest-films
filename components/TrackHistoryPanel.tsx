@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
+import ReportButton from './ReportButton';
 
 export interface PlayedTrack {
   trackId: number;
@@ -121,6 +122,7 @@ function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSa
             </div>
           </>
         ) : null}
+        <ReportButton trackId={track.trackId} />
       </div>
     </div>
   );
