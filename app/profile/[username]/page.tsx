@@ -4,6 +4,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { verifyUserToken } from '@/lib/userAuth';
+import { ACHIEVEMENTS } from '@/lib/achievements';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -17,6 +18,7 @@ export default async function ProfilePage({ params }: Props) {
     where: { username: normalized },
     include: {
       gameHistory: { orderBy: { playedAt: 'desc' }, take: 20 },
+      achievements: { orderBy: { unlockedAt: 'asc' } },
     },
   });
 
@@ -100,6 +102,35 @@ export default async function ProfilePage({ params }: Props) {
             <div className="text-white/50 text-xs">{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Succès */}
+      <div className="w-full max-w-2xl glass rounded-2xl p-6 mb-4">
+        <h2 className="text-[#7ec8e3] font-semibold mb-4">Succès</h2>
+        <div className="grid grid-cols-3 gap-3">
+          {Object.values(ACHIEVEMENTS).map(def => {
+            const unlocked = user.achievements.find(a => a.code === def.code);
+            return (
+              <div
+                key={def.code}
+                className={`rounded-xl p-3 flex flex-col items-center gap-1.5 text-center border transition-all ${
+                  unlocked
+                    ? 'bg-[#7ec8e3]/10 border-[#7ec8e3]/30'
+                    : 'bg-white/3 border-white/5 opacity-40'
+                }`}
+              >
+                <span className="text-3xl">{def.icon}</span>
+                <span className={`text-sm font-semibold ${unlocked ? 'text-white' : 'text-white/50'}`}>{def.name}</span>
+                <span className="text-white/40 text-xs leading-tight">{def.description}</span>
+                {unlocked && (
+                  <span className="text-[#7ec8e3]/60 text-xs mt-0.5">
+                    {new Date(unlocked.unlockedAt).toLocaleDateString('fr-FR')}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Historique */}

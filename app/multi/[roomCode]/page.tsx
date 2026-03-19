@@ -79,6 +79,7 @@ export default function MultiGameRoom() {
   const [remainingLives, setRemainingLives] = useState(3);
   const [gameStartKey, setGameStartKey] = useState(0);
 
+
   // Emotes
   const [emotes, setEmotes] = useState<Emote[]>([]);
   const [showEmoteDropdown, setShowEmoteDropdown] = useState(false);
@@ -907,6 +908,7 @@ export default function MultiGameRoom() {
       {/* Notification Determinoss */}
       <DeterminossNotif gameStartKey={gameStartKey} />
 
+
       <div className="max-w-7xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -921,7 +923,7 @@ export default function MultiGameRoom() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[270px_80px_1fr_80px_220px] items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[270px_80px_1fr_80px_280px] items-start">
           {/* Sidebar gauche - Historique */}
           <div className="hidden lg:block" style={{ height: 'calc(100vh - 140px)', position: 'sticky', top: 16 }}>
             <TrackHistoryPanel
@@ -1154,6 +1156,7 @@ export default function MultiGameRoom() {
                     <div
                       ref={emoteDropdownRef}
                       className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+                      style={{ background: 'rgba(0, 20, 32, 0.85)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}
                     >
                       {filteredEmotes.map((emote, index) => (
                         <div
@@ -1182,6 +1185,7 @@ export default function MultiGameRoom() {
                       id="autocomplete-dropdown"
                       role="listbox"
                       className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+                      style={{ background: 'rgba(0, 20, 32, 0.85)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}
                     >
                       {filteredSuggestions.map((suggestion, index) => {
                         const displayText = suggestion.titleVF

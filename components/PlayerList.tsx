@@ -32,24 +32,24 @@ export default function PlayerList({ players, hostId, currentPlayerId, roundFind
                   : 'bg-white/5 border border-white/10'
               }`}
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="text-white/50 text-sm w-5 text-center font-bold shrink-0">
                   {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
                 </span>
-                <UserAvatar avatarFile={player.avatarFile} pseudo={player.pseudo} size={28} />
-                <span className={`text-sm ${player.id === currentPlayerId ? 'text-[#7ec8e3] font-semibold' : 'text-white'}`}>
+                <UserAvatar avatarFile={player.avatarFile} pseudo={player.pseudo} size={28} className="shrink-0" />
+                <span className={`text-sm truncate min-w-0 ${player.id === currentPlayerId ? 'text-[#7ec8e3] font-semibold' : 'text-white'}`}>
                   {player.pseudo}
                 </span>
                 {player.id === hostId && (
-                  <span className="text-xs bg-[#4a90d9]/30 text-[#7ec8e3] px-1.5 py-0.5 rounded border border-[#4a90d9]/50">
+                  <span className="text-xs bg-[#4a90d9]/30 text-[#7ec8e3] px-1.5 py-0.5 rounded border border-[#4a90d9]/50 shrink-0">
                     Hôte
                   </span>
                 )}
                 {hasFound && (
-                  <span className="text-[#7fba00] text-sm">✓</span>
+                  <span className="text-[#7fba00] text-sm shrink-0">✓</span>
                 )}
               </div>
-              <span className="text-[#7fba00] font-bold">{player.score}</span>
+              <span className="text-[#7fba00] font-bold shrink-0 ml-2">{player.score}</span>
             </div>
           );
         })}

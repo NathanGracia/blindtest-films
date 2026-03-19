@@ -42,15 +42,26 @@ model Report {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  username     String       @unique   // Login + URL (immuable, minuscules)
-  displayName  String?               // Pseudo affiché en jeu (modifiable)
+  id           Int               @id @default(autoincrement())
+  username     String            @unique
+  displayName  String?
   passwordHash String
-  avatarFile   String?               // /avatars/user-1.jpg
-  isAdmin      Boolean      @default(false)
-  createdAt    DateTime     @default(now())
+  avatarFile   String?
+  isAdmin      Boolean           @default(false)
+  createdAt    DateTime          @default(now())
   gameHistory  GameResult[]
   notes        UserTrackNote[]
+  achievements UserAchievement[]
+}
+
+model UserAchievement {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, code])
 }
 
 model UserTrackNote {

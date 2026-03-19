@@ -50,6 +50,40 @@ async function saveGameResult({ userId, score, rank, totalPlayers, tracksFound, 
   }
 }
 
+// Définitions des succès (dupliquées ici pour eviter import ESM)
+const ACHIEVEMENT_DEFS = {
+  first_game: { name: 'Première partie',  description: 'Jouer sa première partie',                      icon: '🎮' },
+  champion:   { name: 'Champion',         description: 'Finir 1er avec au moins 2 joueurs',             icon: '🏆' },
+  perfect:    { name: 'Sans faute',       description: 'Trouver toutes les tracks d\'une partie',       icon: '💯' },
+};
+
+async function checkAndUnlockAchievements(player, { rank, totalPlayers, tracksFound, totalTracks }) {
+  if (!player.userId) return;
+  try {
+    const existing = await prisma.userAchievement.findMany({
+      where: { userId: player.userId },
+      select: { code: true },
+    });
+    const have = new Set(existing.map(a => a.code));
+    const toUnlock = [];
+
+    if (!have.has('first_game')) toUnlock.push('first_game');
+    if (!have.has('champion') && rank === 1 && totalPlayers >= 2) toUnlock.push('champion');
+    if (!have.has('perfect') && tracksFound === totalTracks && totalTracks > 0) toUnlock.push('perfect');
+
+    if (toUnlock.length === 0) return;
+
+    await prisma.userAchievement.createMany({
+      data: toUnlock.map(code => ({ userId: player.userId, code })),
+      skipDuplicates: true,
+    });
+
+    console.log(`[ACHIEVEMENT] ${player.pseudo}: ${toUnlock.join(', ')}`);
+  } catch (err) {
+    console.error('[ACHIEVEMENT] Erreur:', err);
+  }
+}
+
 // Sauvegarder le score dans le ladder (upsert)
 async function saveLadderScore(pseudo, score) {
   if (!pseudo || score <= 0) return;
@@ -575,6 +609,14 @@ async function nextTrackPublic(room) {
         categories: publicCategories,
         roomCode: PUBLIC_ROOM_CODE,
       });
+      if (ioInstance) {
+        await checkAndUnlockAchievements(player, {
+          rank: i + 1,
+          totalPlayers: sortedPlayers.length,
+          tracksFound: player.tracksFound || 0,
+          totalTracks: room.tracks.length,
+        });
+      }
     }
 
     if (ioInstance) {
@@ -1355,6 +1397,12 @@ app.prepare().then(async () => {
           totalTracks,
           categories,
           roomCode,
+        });
+        await checkAndUnlockAchievements(p, {
+          rank: i + 1,
+          totalPlayers: sortedPlayers.length,
+          tracksFound: p.tracksFound || 0,
+          totalTracks,
         });
       }
 

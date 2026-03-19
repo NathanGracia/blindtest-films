@@ -69,6 +69,8 @@ export interface ChatMessage {
   playerId: string;
   isFromFinder?: boolean;
   isHint?: boolean;
+  isAchievement?: boolean;
+  achievementIcon?: string;
   avatarFile?: string | null;
   username?: string | null;
 }
