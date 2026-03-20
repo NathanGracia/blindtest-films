@@ -5,6 +5,7 @@ import { Category } from '@/types';
 
 interface CategoryWithCount extends Category {
   trackCount: number;
+  featuredImage?: string | null;
 }
 
 interface CategorySelectorProps {
@@ -38,10 +39,8 @@ export default function CategorySelector({
   const initializedRef = useRef(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
 
-  // Garder la ref à jour
   onSelectionChangeRef.current = onSelectionChange;
 
-  // Charger les catégories (une seule fois)
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -53,17 +52,13 @@ export default function CategorySelector({
           const data = await res.json();
           setCategories(data);
 
-          // Initialiser la sélection
           let initialSet: Set<string>;
           if (initialSelection && initialSelection.length > 0) {
             initialSet = new Set(initialSelection);
           } else {
-            // Par défaut, tout est sélectionné
             initialSet = new Set(data.map((c: CategoryWithCount) => c.id));
           }
           setSelected(initialSet);
-
-          // Notifier le parent une seule fois après l'initialisation
           onSelectionChangeRef.current(Array.from(initialSet));
         }
       } catch (error) {
@@ -74,21 +69,16 @@ export default function CategorySelector({
     };
 
     loadCategories();
-  }, []); // Pas de dépendances - ne s'exécute qu'une fois
+  }, []);
 
   const toggleCategory = (id: string) => {
     setSelected((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
-        // Ne pas permettre de tout désélectionner
-        if (newSet.size > 1) {
-          newSet.delete(id);
-        }
+        if (newSet.size > 1) newSet.delete(id);
       } else {
         newSet.add(id);
       }
-
-      // Notifier le parent directement
       onSelectionChangeRef.current(Array.from(newSet));
       return newSet;
     });
@@ -104,9 +94,7 @@ export default function CategorySelector({
     const index = parseInt(e.target.value);
     const rounds = ROUNDS_OPTIONS[index];
     setSelectedRounds(rounds);
-    if (onRoundsChange) {
-      onRoundsChange(rounds);
-    }
+    if (onRoundsChange) onRoundsChange(rounds);
   };
 
   const totalSelected = categories
@@ -124,16 +112,12 @@ export default function CategorySelector({
     );
   }
 
-  if (categories.length === 0) {
-    return null;
-  }
+  if (categories.length === 0) return null;
 
   return (
     <div className="glass rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[#7ec8e3] font-semibold text-sm">
-          Catégories
-        </h3>
+        <h3 className="text-[#7ec8e3] font-semibold text-sm">Catégories</h3>
         <button
           onClick={selectAll}
           className="text-xs text-white/50 hover:text-white transition-colors"
@@ -151,43 +135,77 @@ export default function CategorySelector({
             <button
               key={category.id}
               onClick={() => toggleCategory(category.id)}
-              className={`
-                relative p-3 rounded-lg border transition-all duration-200
-                ${isSelected
-                  ? 'border-white/40 bg-white/10'
-                  : 'border-white/10 bg-white/5 opacity-50'
-                }
-                hover:border-white/30 hover:bg-white/15
-              `}
+              className="group relative rounded-xl overflow-hidden flex flex-col transition-all duration-200"
               style={{
-                boxShadow: isSelected ? `0 0 15px ${category.color}30` : 'none',
+                aspectRatio: '2/1.3',
+                boxShadow: isSelected
+                  ? `0 4px 20px ${category.color}40, 0 0 0 2px ${category.color}88`
+                  : '0 2px 10px rgba(0,0,0,0.3)',
+                opacity: isSelected ? 1 : 0.45,
               }}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{icon}</span>
-                <div className="text-left flex-1 min-w-0">
-                  <div className="text-white text-sm font-medium truncate">
-                    {category.name}
-                  </div>
-                  <div className="text-white/40 text-xs">
-                    {category.trackCount} musique{category.trackCount > 1 ? 's' : ''}
-                  </div>
-                </div>
+              {/* Image de fond */}
+              {category.featuredImage ? (
+                <img
+                  src={category.featuredImage}
+                  alt={category.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
                 <div
-                  className={`
-                    w-5 h-5 rounded-full border-2 flex items-center justify-center
-                    ${isSelected ? 'border-[#7fba00] bg-[#7fba00]' : 'border-white/30'}
-                  `}
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ background: `${category.color}22` }}
                 >
-                  {isSelected && (
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  )}
+                  <span className="text-3xl opacity-20">{icon}</span>
+                </div>
+              )}
+
+              {/* Barre couleur catégorie */}
+              <div
+                className="relative z-10 shrink-0"
+                style={{ height: 3, background: `linear-gradient(90deg, ${category.color}dd, ${category.color}33)` }}
+              />
+
+              {/* Spacer */}
+              <div className="flex-1 relative z-10" />
+
+              {/* Overlay infos */}
+              <div className="relative z-10">
+                {/* Couche blur */}
+                <div
+                  className="absolute left-0 right-0 bottom-0 pointer-events-none"
+                  style={{
+                    top: '-100%',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 60%)',
+                    maskImage: 'linear-gradient(to bottom, transparent 0%, black 60%)',
+                  }}
+                />
+                {/* Fond sombre */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: 'linear-gradient(180deg, rgba(0,10,15,0) 0%, rgba(0,10,15,0.6) 40%, rgba(0,10,15,0.88) 100%)' }}
+                />
+                {/* Texte */}
+                <div className="relative px-2.5 pt-2 pb-2.5 flex items-end justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-white text-xs font-semibold leading-tight truncate">{category.name}</p>
+                    <p className="text-white/40 text-xs leading-tight">{category.trackCount} musique{category.trackCount > 1 ? 's' : ''}</p>
+                  </div>
+                  <div
+                    className="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
+                    style={{
+                      borderColor: isSelected ? '#7fba00' : 'rgba(255,255,255,0.3)',
+                      background: isSelected ? '#7fba00' : 'transparent',
+                    }}
+                  >
+                    {isSelected && (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>

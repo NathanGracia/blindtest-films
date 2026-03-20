@@ -252,24 +252,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Bouton Rejoindre partie publique */}
-          <div className="mb-4">
-            <button
-              onClick={handleJoinPublic}
-              disabled={isLoading}
-              className="btn-aero-green flex items-center justify-center gap-3 w-full px-8 py-4 text-white text-xl font-semibold rounded-xl disabled:opacity-50"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Connexion...
-                </span>
-              ) : (
-                '🌍 Rejoindre la partie publique (🏆classée)'
-              )}
-            </button>
-          </div>
-
           {/* Sélecteur de difficulté (rooms privées) */}
           <div className="mb-4 glass rounded-xl p-4">
             <label className="block text-[#7ec8e3] text-sm mb-3 font-semibold text-left">
@@ -379,7 +361,7 @@ export default function Home() {
 
         {/* Sidebar Ladder - centré dans l'espace de droite */}
         <div className="hidden lg:flex justify-center">
-          <LadderSidebar />
+          <LadderSidebar onJoinPublic={handleJoinPublic} isJoining={isLoading} />
         </div>
       </div>
 
