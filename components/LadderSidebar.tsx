@@ -18,6 +18,14 @@ interface LadderSidebarProps {
   isJoining?: boolean;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  rankedEnabled: boolean;
+}
+
 const RANK_CONFIG: Record<number, { gradient: string; border: string; glow: string; medal: string; textColor: string }> = {
   1: {
     gradient: 'linear-gradient(135deg, rgba(255,215,0,0.15) 0%, rgba(255,180,0,0.08) 100%)',
@@ -44,16 +52,22 @@ const RANK_CONFIG: Record<number, { gradient: string; border: string; glow: stri
 
 export default function LadderSidebar({ onJoinPublic, isJoining }: LadderSidebarProps) {
   const [entries, setEntries] = useState<LadderEntry[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const fetchLadder = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch('/api/ladder');
-        const data = await res.json();
-        setEntries(data.entries || []);
+        const [ladderRes, catsRes] = await Promise.all([
+          fetch('/api/ladder'),
+          fetch('/api/categories'),
+        ]);
+        const ladderData = await ladderRes.json();
+        const catsData = await catsRes.json();
+        setEntries(ladderData.entries || []);
+        setCategories((catsData as Category[]).filter(c => c.rankedEnabled));
       } catch (error) {
         console.error('Erreur chargement ladder:', error);
       } finally {
@@ -61,9 +75,7 @@ export default function LadderSidebar({ onJoinPublic, isJoining }: LadderSidebar
       }
     };
 
-    fetchLadder();
-    const interval = setInterval(fetchLadder, 30000);
-    return () => clearInterval(interval);
+    fetchData();
   }, []);
 
   if (isLoading) {
@@ -216,6 +228,49 @@ export default function LadderSidebar({ onJoinPublic, isJoining }: LadderSidebar
               </>
             )}
           </button>
+        )}
+
+        {categories.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <style>{`
+              @keyframes livePulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.4; transform: scale(0.7); }
+              }
+            `}</style>
+            <p className="text-white/20 text-xs text-center uppercase tracking-widest">En jeu</p>
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {categories.map((cat, i) => (
+                <div
+                  key={cat.id}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                  style={{
+                    background: `${cat.color}22`,
+                    border: `1px solid ${cat.color}50`,
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    boxShadow: `0 0 10px ${cat.color}15`,
+                    animationDelay: `${i * 0.15}s`,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: cat.color,
+                      boxShadow: `0 0 5px ${cat.color}`,
+                      flexShrink: 0,
+                      animation: `livePulse 2s ease-in-out ${i * 0.4}s infinite`,
+                    }}
+                  />
+                  <span className="text-xs font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                    {cat.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
