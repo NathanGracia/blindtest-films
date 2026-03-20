@@ -105,7 +105,7 @@ export default function TracksPage() {
       setReportsLoading(trackId);
       try {
         const res = await fetch(`/api/admin/tracks/${trackId}/reports`);
-        if (res.ok) setReportsData(prev => ({ ...prev, [trackId]: await res.json() }));
+        if (res.ok) { const data = await res.json(); setReportsData(prev => ({ ...prev, [trackId]: data })); }
       } finally {
         setReportsLoading(null);
       }
