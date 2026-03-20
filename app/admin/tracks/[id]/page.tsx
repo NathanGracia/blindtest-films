@@ -27,6 +27,11 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true);
   const [audioTab, setAudioTab] = useState<'upload' | 'youtube'>('upload');
 
+  // Reports
+  const [reports, setReports] = useState<{ id: number; message: string; createdAt: string }[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [resettingReports, setResettingReports] = useState(false);
+
   // Audio preview
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -68,6 +73,29 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
 
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/admin/tracks/${id}/reports`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setReports)
+      .finally(() => setReportsLoading(false));
+  }, [id]);
+
+  const handleResetReports = async () => {
+    setResettingReports(true);
+    try {
+      await fetch(`/api/admin/tracks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset-reports' }),
+      });
+      setReports([]);
+      setTrack(prev => prev ? { ...prev, reportCount: 0 } : prev);
+    } finally {
+      setResettingReports(false);
+    }
+  };
 
   // Gestion de l'audio
   useEffect(() => {
@@ -189,6 +217,8 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
     );
   }
 
+  const reportCount = reports.length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -216,7 +246,8 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
         </div>
       </div>
 
-      <form id="track-edit-form" onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+      <div className="flex gap-6 items-start">
+      <form id="track-edit-form" onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0">
         {error && (
           <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-red-400">
             {error}
@@ -443,6 +474,45 @@ export default function EditTrackPage({ params }: { params: Promise<{ id: string
           </Link>
         </div>
       </form>
+
+      {/* Panneau reports */}
+      <div className="w-72 shrink-0 sticky top-6">
+        <div className="glass rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold" style={{ color: reportCount > 0 ? '#e8445a' : 'rgba(255,255,255,0.4)' }}>
+              ⚑ Signalements {reportCount > 0 ? `(${reportCount})` : ''}
+            </span>
+            {reportCount > 0 && (
+              <button
+                onClick={handleResetReports}
+                disabled={resettingReports}
+                className="text-xs px-2 py-1 rounded transition-colors disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}
+              >
+                {resettingReports ? '...' : 'Reset'}
+              </button>
+            )}
+          </div>
+
+          {reportsLoading ? (
+            <p className="text-white/30 text-xs">Chargement...</p>
+          ) : reportCount === 0 ? (
+            <p className="text-white/20 text-xs italic">Aucun signalement</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+              {reports.map(r => (
+                <div key={r.id} className="text-xs" style={{ borderLeft: '2px solid rgba(232,68,90,0.4)', paddingLeft: 8 }}>
+                  <p className="text-white/30 mb-0.5">
+                    {new Date(r.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <p className="text-white/70">{r.message || <span className="italic text-white/20">sans message</span>}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
     </div>
   );
 }

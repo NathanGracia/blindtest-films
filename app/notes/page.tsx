@@ -33,6 +33,8 @@ export default function NotesPage() {
   const [search, setSearch] = useState('');
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   useEffect(() => {
     fetch('/api/user/notes')
@@ -69,6 +71,27 @@ export default function NotesPage() {
   useEffect(() => {
     return () => { audioRef.current?.pause(); };
   }, []);
+
+  const startEdit = (entry: NoteEntry) => {
+    setEditingId(entry.id);
+    setEditValue(entry.note);
+  };
+
+  const saveEdit = async (entry: NoteEntry) => {
+    const trimmed = editValue.trim();
+    setEditingId(null);
+    if (trimmed === entry.note) return;
+    await fetch('/api/user/notes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackId: entry.track.id, note: trimmed }),
+    });
+    setNotes(prev => prev.map(n =>
+      n.id === entry.id
+        ? { ...n, note: trimmed, updatedAt: new Date().toISOString() }
+        : n
+    ).filter(n => n.note !== ''));
+  };
 
   const filtered = notes.filter(e =>
     e.track.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -166,26 +189,55 @@ export default function NotesPage() {
                   </div>
 
                   {/* Note */}
-                  <p
-                    className="text-sm leading-snug px-3 py-2 rounded-lg"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.08)' }}
-                  >
-                    {entry.note}
-                  </p>
+                  {editingId === entry.id ? (
+                    <textarea
+                      autoFocus
+                      ref={el => { if (el) { el.setSelectionRange(el.value.length, el.value.length); } }}
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value.slice(0, 100))}
+                      onBlur={() => saveEdit(entry)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(entry); } if (e.key === 'Escape') { setEditingId(null); } }}
+                      rows={2}
+                      className="w-full text-sm leading-snug px-3 py-2 rounded-lg resize-none focus:outline-none text-white"
+                      style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(126,200,227,0.4)' }}
+                    />
+                  ) : (
+                    <p
+                      onClick={() => startEdit(entry)}
+                      title="Cliquer pour modifier"
+                      className="text-sm leading-snug px-3 py-2 rounded-lg cursor-text"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      {entry.note}
+                    </p>
+                  )}
 
-                  {/* Footer : date + play */}
+                  {/* Footer : date + play + delete */}
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-white/25 text-xs">
                       {new Date(entry.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
+                    <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setNotes(prev => prev.filter(n => n.id !== entry.id)); fetch('/api/user/notes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trackId: entry.track.id, note: '' }) }); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                      style={{ background: 'rgba(232,68,90,0.15)', color: 'rgba(248, 194, 194, 0.85)', border: '1px solid rgba(232,68,90,0.3)', transition: 'background 0.15s, border-color 0.15s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(232,68,90,0.3)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(232,68,90,0.6)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(232,68,90,0.15)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(232,68,90,0.3)'; }}
+                    >
+                      Effacer
+                    </button>
                     <button
                       onClick={() => togglePlay(entry)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
                       style={{
                         background: isPlaying ? 'rgba(126,200,227,0.2)' : 'rgba(255,255,255,0.08)',
-                        color: isPlaying ? '#7ec8e3' : 'rgba(255,255,255,0.5)',
+                        color: isPlaying ? '#7ec8e3' : 'rgba(255,255,255,0.85)',
                         border: `1px solid ${isPlaying ? 'rgba(126,200,227,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                        transition: 'background 0.15s, border-color 0.15s',
                       }}
+                      onMouseEnter={e => { if (playingId !== entry.track.id) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.15)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.25)'; } }}
+                      onMouseLeave={e => { if (playingId !== entry.track.id) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)'; } }}
                     >
                       {isPlaying ? (
                         <>
@@ -204,6 +256,7 @@ export default function NotesPage() {
                         </>
                       )}
                     </button>
+                    </div>
                   </div>
                 </div>
               </div>

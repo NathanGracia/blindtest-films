@@ -147,6 +147,16 @@ export default function TracksPage() {
   };
 
   const handleSort = (field: SortField) => {
+    if (field === 'reports') {
+      if (sortField === 'reports') {
+        setSortField('default');
+        setSortDirection('asc');
+      } else {
+        setSortField('reports');
+        setSortDirection('desc');
+      }
+      return;
+    }
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -160,6 +170,7 @@ export default function TracksPage() {
     if (filter) result = result.filter(t => t.categoryId === filter);
     if (difficultyFilter === 'untagged') result = result.filter(t => !t.difficulty);
     else if (difficultyFilter) result = result.filter(t => t.difficulty === difficultyFilter);
+    if (sortField === 'reports') result = result.filter(t => (t.reportCount || 0) > 0);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => t.title.toLowerCase().includes(q) || t.titleVF?.toLowerCase().includes(q));
@@ -355,11 +366,11 @@ export default function TracksPage() {
                 />
 
                 {/* Badges flottants (hors hover) */}
-                <div className="relative z-10 flex items-start justify-between px-2 pt-2 shrink-0">
+                <div className="relative z-30 flex items-start justify-between px-2 pt-2 shrink-0">
                   {diff ? (
                     <span
                       className="text-xs font-bold px-1.5 py-0.5 rounded leading-none"
-                      style={{ background: `${diff.color}33`, color: diff.color, border: `1px solid ${diff.color}55` }}
+                      style={{ background: `${diff.color}33`, color: diff.color, border: `1px solid ${diff.color}55`, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
                     >
                       {diff.label}
                     </span>
@@ -368,7 +379,7 @@ export default function TracksPage() {
                     <button
                       onClick={() => toggleReports(track.id)}
                       className="text-xs font-bold px-1.5 py-0.5 rounded leading-none transition-all"
-                      style={{ background: 'rgba(232,68,90,0.3)', color: '#e8445a', border: '1px solid rgba(232,68,90,0.5)' }}
+                      style={{ background: 'rgba(232,68,90,0.3)', color: '#e8445a', border: '1px solid rgba(232,68,90,0.5)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
                     >
                       ⚑ {reportCount}
                     </button>
@@ -381,11 +392,21 @@ export default function TracksPage() {
                 {/* Overlay infos (toujours visible) */}
                 <div
                   className="relative z-10 px-2.5 pt-2 pb-2.5 group-hover:pb-1 transition-all"
-                  style={{
-                    background: 'linear-gradient(180deg, rgba(0,10,15,0) 0%, rgba(0,10,15,0.7) 25%, rgba(0,10,15,0.9) 100%)',
-                    backdropFilter: 'blur(4px)',
-                  }}
                 >
+                  {/* Couche blur seule avec dégradé de masque — remonte 120% au-dessus du panneau */}
+                  <div className="absolute left-0 right-0 bottom-0 pointer-events-none" style={{
+                    top: '-200%',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 70%)',
+                    maskImage: 'linear-gradient(to bottom, transparent 0%, black 70%)',
+                  }} />
+                  {/* Fond sombre dégradé */}
+                  <div className="absolute inset-0 pointer-events-none" style={{
+                    background: 'linear-gradient(180deg, rgba(0,10,15,0) 0%, rgba(0, 10, 15, 0.21) 30%, rgba(0, 10, 15, 0.49) 100%)',
+                  }} />
+                  {/* Texte au-dessus, sans mask */}
+                  <div className="relative">
                   <p className="text-white text-xs font-semibold leading-tight line-clamp-2">{track.title}</p>
                   {track.titleVF && (
                     <p className="text-white/40 text-xs leading-tight line-clamp-1 mt-0.5">{track.titleVF}</p>
@@ -395,6 +416,7 @@ export default function TracksPage() {
                       {category.name}
                     </span>
                   )}
+                  </div>
                 </div>
 
                 {/* Overlay actions (visible au hover) */}
@@ -467,7 +489,7 @@ export default function TracksPage() {
                 {isReportsOpen && (
                   <div
                     className="absolute inset-0 z-30 flex flex-col p-3 overflow-y-auto"
-                    style={{ background: 'rgba(0,5,10,0.95)', backdropFilter: 'blur(10px)' }}
+                    style={{ background: 'rgba(0,5,10,0.75)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
                   >
                     <div className="flex items-center justify-between mb-3 shrink-0">
                       <span className="text-red-400 text-xs font-bold">⚑ Signalements ({reportCount})</span>

@@ -32,3 +32,25 @@ export async function GET() {
 
   return NextResponse.json(notes);
 }
+
+export async function PATCH(request: Request) {
+  const cookieStore = await cookies();
+  const session = cookieStore.get('blindtoss_user_session');
+  if (!session?.value) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
+
+  const userId = verifyUserToken(session.value);
+  if (!userId) return NextResponse.json({ error: 'Session invalide' }, { status: 401 });
+
+  const { trackId, note } = await request.json();
+  if (!trackId) return NextResponse.json({ error: 'trackId requis' }, { status: 400 });
+
+  const trimmed = String(note || '').slice(0, 100);
+
+  await prisma.userTrackNote.upsert({
+    where: { userId_trackId: { userId, trackId } },
+    update: { note: trimmed },
+    create: { userId, trackId, note: trimmed },
+  });
+
+  return NextResponse.json({ ok: true });
+}
