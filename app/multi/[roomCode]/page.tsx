@@ -1375,11 +1375,9 @@ export default function MultiGameRoom() {
                             <div className="text-sm leading-tight truncate" style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.88)', fontWeight: isSelected ? 600 : 400 }}>
                               {suggestion.title}
                             </div>
-                            {suggestion.titleVF && (
-                              <div className="text-xs leading-tight truncate mt-0.5" style={{ color: isSelected ? 'rgba(126,200,227,0.7)' : 'rgba(255,255,255,0.35)' }}>
-                                {suggestion.titleVF}
-                              </div>
-                            )}
+                            <div className="text-xs leading-tight truncate mt-0.5" style={{ color: isSelected ? 'rgba(126,200,227,0.7)' : 'rgba(255,255,255,0.35)' }}>
+                              {suggestion.titleVF ?? '\u00A0'}
+                            </div>
                           </div>
                         );
                       })}
