@@ -64,13 +64,18 @@ function TrackCard({ track, note, saveStatus, isLoggedIn, onNoteChange, onNoteSa
 
   return (
     <div
-      className="rounded-xl overflow-hidden flex flex-col relative"
-      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.3)', minHeight: 240 }}
+      className="rounded-xl flex flex-col overflow-hidden relative shrink-0"
+      style={{
+        boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+        minHeight: 240,
+        backgroundImage: track.imageFile ? `url(${track.imageFile})` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+      }}
     >
-      {track.imageFile ? (
-        <img src={track.imageFile} alt={track.title} className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div className="absolute inset-0 bg-white/5 flex items-center justify-center">
+      {!track.imageFile && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-4xl opacity-20">🎬</span>
         </div>
       )}
