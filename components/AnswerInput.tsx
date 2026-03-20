@@ -203,28 +203,62 @@ export default function AnswerInput({ onSubmit, attempts, disabled, availableAns
             ref={dropdownRef}
             id="autocomplete-dropdown"
             role="listbox"
-            className="absolute top-full left-0 right-0 mt-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
+            className="glass absolute top-full left-0 right-0 z-50 overflow-hidden overflow-y-auto"
+            style={{
+              marginTop: 6,
+              maxHeight: 252,
+              borderRadius: 10,
+              scrollbarWidth: 'none',
+            }}
           >
             {filteredSuggestions.map((suggestion, index) => {
-              const displayText = suggestion.titleVF
-                ? `${suggestion.title} - ${suggestion.titleVF}`
-                : suggestion.title;
+              const isSelected = index === selectedIndex;
 
               return (
                 <div
                   key={index}
                   role="option"
-                  aria-selected={index === selectedIndex}
+                  aria-selected={isSelected}
                   onClick={() => selectSuggestion(suggestion)}
-                  className={`px-4 py-3 cursor-pointer transition-colors ${
-                    index === selectedIndex
-                      ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white font-semibold'
-                      : index === 0 && selectedIndex === -1
-                        ? 'bg-[#4a90d9]/20 border-l-2 border-[#4a90d9]/50 text-white'
-                        : 'hover:bg-white/10 text-white/90'
-                  }`}
+                  className="cursor-pointer transition-all duration-100"
+                  style={{
+                    padding: '7px 12px 7px 14px',
+                    borderLeft: isSelected
+                      ? '3px solid #7ec8e3'
+                      : '3px solid transparent',
+                    background: isSelected
+                      ? 'linear-gradient(90deg, rgba(126,200,227,0.12) 0%, rgba(126,200,227,0.04) 100%)'
+                      : 'transparent',
+                    borderBottom: index < filteredSuggestions.length - 1
+                      ? '1px solid rgba(255,255,255,0.04)'
+                      : 'none',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
                 >
-                  {displayText}
+                  <div
+                    className="text-sm leading-tight truncate"
+                    style={{
+                      color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.88)',
+                      fontWeight: isSelected ? 600 : 400,
+                      letterSpacing: isSelected ? '0.01em' : undefined,
+                      textShadow: isSelected ? '0 0 12px rgba(126,200,227,0.4)' : undefined,
+                    }}
+                  >
+                    {suggestion.title}
+                  </div>
+                  {suggestion.titleVF && (
+                    <div
+                      className="text-xs leading-tight truncate mt-0.5"
+                      style={{ color: isSelected ? 'rgba(126,200,227,0.7)' : 'rgba(255,255,255,0.35)' }}
+                    >
+                      {suggestion.titleVF}
+                    </div>
+                  )}
                 </div>
               );
             })}

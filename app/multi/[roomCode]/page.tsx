@@ -1323,18 +1323,19 @@ export default function MultiGameRoom() {
                   {showEmoteDropdown && filteredEmotes.length > 0 && (
                     <div
                       ref={emoteDropdownRef}
-                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
-                      style={{ background: 'rgba(0, 20, 32, 0.85)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}
+                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden overflow-y-auto z-50"
+                      style={{ maxHeight: 224, scrollbarWidth: 'none', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
                     >
                       {filteredEmotes.map((emote, index) => (
                         <div
                           key={emote.id}
                           onClick={() => selectEmote(emote)}
-                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-                            index === selectedEmoteIndex
-                              ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white'
-                              : 'hover:bg-white/10 text-white/90'
-                          }`}
+                          className="flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors"
+                          style={{
+                            borderLeft: index === selectedEmoteIndex ? '3px solid #7ec8e3' : '3px solid transparent',
+                            background: index === selectedEmoteIndex ? 'rgba(126,200,227,0.1)' : 'transparent',
+                            borderBottom: index < filteredEmotes.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                          }}
                         >
                           <span className="w-7 h-7 flex items-center justify-center shrink-0">
                             {emote.imageFile
@@ -1342,7 +1343,7 @@ export default function MultiGameRoom() {
                               : <span className="text-white/30 text-xs">?</span>
                             }
                           </span>
-                          <span className="text-sm font-mono text-white/70">:{emote.code}:</span>
+                          <span className="text-sm font-mono" style={{ color: index === selectedEmoteIndex ? '#7ec8e3' : 'rgba(255,255,255,0.7)' }}>:{emote.code}:</span>
                         </div>
                       ))}
                     </div>
@@ -1352,28 +1353,33 @@ export default function MultiGameRoom() {
                       ref={dropdownRef}
                       id="autocomplete-dropdown"
                       role="listbox"
-                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden max-h-[240px] overflow-y-auto z-50"
-                      style={{ background: 'rgba(0, 20, 32, 0.85)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}
+                      className="absolute left-0 right-0 bottom-full mb-1 glass rounded-lg overflow-hidden overflow-y-auto z-50"
+                      style={{ maxHeight: 224, scrollbarWidth: 'none', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
                     >
                       {filteredSuggestions.map((suggestion, index) => {
-                        const displayText = suggestion.titleVF
-                          ? `${suggestion.title} - ${suggestion.titleVF}`
-                          : suggestion.title;
+                        const isSelected = index === selectedIndex;
                         return (
                           <div
                             key={index}
                             role="option"
-                            aria-selected={index === selectedIndex}
+                            aria-selected={isSelected}
                             onClick={() => selectSuggestion(suggestion)}
-                            className={`px-4 py-3 cursor-pointer transition-colors ${
-                              index === selectedIndex
-                                ? 'bg-[#4a90d9]/40 border-l-4 border-[#4a90d9] text-white font-semibold'
-                                : index === 0 && selectedIndex === -1
-                                  ? 'bg-[#4a90d9]/20 border-l-2 border-[#4a90d9]/50 text-white'
-                                  : 'hover:bg-white/10 text-white/90'
-                            }`}
+                            className="cursor-pointer transition-colors"
+                            style={{
+                              padding: '7px 12px 7px 14px',
+                              borderLeft: isSelected ? '3px solid #7ec8e3' : '3px solid transparent',
+                              background: isSelected ? 'rgba(126,200,227,0.1)' : 'transparent',
+                              borderBottom: index < filteredSuggestions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                            }}
                           >
-                            {displayText}
+                            <div className="text-sm leading-tight truncate" style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.88)', fontWeight: isSelected ? 600 : 400 }}>
+                              {suggestion.title}
+                            </div>
+                            {suggestion.titleVF && (
+                              <div className="text-xs leading-tight truncate mt-0.5" style={{ color: isSelected ? 'rgba(126,200,227,0.7)' : 'rgba(255,255,255,0.35)' }}>
+                                {suggestion.titleVF}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
