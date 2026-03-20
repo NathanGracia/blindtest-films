@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { code, emoji } = await request.json();
+    const { code, emoji, achievementCode } = await request.json();
 
     if (code && !/^[a-z0-9_]+$/.test(code)) {
       return NextResponse.json({ error: 'Code invalide' }, { status: 400 });
@@ -15,6 +15,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       data: {
         ...(code && { code }),
         ...(emoji !== undefined && { emoji: emoji || null }),
+        ...(achievementCode !== undefined && { achievementCode: achievementCode || null }),
       },
     });
     return NextResponse.json(emote);

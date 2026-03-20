@@ -12,6 +12,7 @@ import ReportButton from '@/components/ReportButton';
 import VolumeSlider from '@/components/VolumeSlider';
 import DeterminossNotif from '@/components/DeterminossNotif';
 import TrackHistoryPanel, { PlayedTrack } from '@/components/TrackHistoryPanel';
+import AchievementToast from '@/components/AchievementToast';
 import Link from 'next/link';
 import UserAvatar from '@/components/UserAvatar';
 import { Player, ChatMessage, RoomState, Category } from '@/types';
@@ -86,6 +87,9 @@ export default function MultiGameRoom() {
   const [filteredEmotes, setFilteredEmotes] = useState<Emote[]>([]);
   const [selectedEmoteIndex, setSelectedEmoteIndex] = useState(-1);
   const emoteDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Succès débloqués (toasts)
+  const [unlockedAchievements, setUnlockedAchievements] = useState<{ code: string; name: string; description: string; icon: string; imageFile?: string | null }[]>([]);
 
   // Historique des tracks joués + notes
   const [playedTracks, setPlayedTracks] = useState<PlayedTrack[]>([]);
@@ -446,6 +450,12 @@ export default function MultiGameRoom() {
       setNoteSaveStatus(prev => ({ ...prev, [trackId]: 'saved' }));
     });
 
+    socket.on('achievement:unlocked', (achievement: { code: string; name: string; description: string; icon: string; imageFile?: string | null }) => {
+      setUnlockedAchievements(prev => [...prev, achievement]);
+      // Recharger les emotes (la nouvelle est maintenant débloquée)
+      fetch('/api/emotes').then(r => r.ok ? r.json() : null).then(data => { if (data) setEmotes(data); }).catch(() => {});
+    });
+
     return () => {
       // Emit leave when the component unmounts so server state is cleaned up
       socket.emit('room:leave');
@@ -467,6 +477,7 @@ export default function MultiGameRoom() {
       socket.off('public:restart-countdown');
       socket.off('game:wrong-answer');
       socket.off('note:saved');
+      socket.off('achievement:unlocked');
     };
   }, [router, roomCode]);
 
@@ -877,21 +888,96 @@ export default function MultiGameRoom() {
                     En attente de joueurs...
                   </div>
                 )}
+                {categories.filter(c => c.rankedEnabled).length > 0 && (
+                  <div className="flex flex-col gap-1.5 mt-4">
+                    <style>{`
+                      @keyframes livePulse {
+                        0%, 100% { opacity: 1; transform: scale(1); }
+                        50% { opacity: 0.4; transform: scale(0.7); }
+                      }
+                    `}</style>
+                    <div className="flex flex-wrap gap-1.5 justify-center">
+                      {categories.filter(c => c.rankedEnabled).map((category, i) => (
+                        <div
+                          key={category.id}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                          style={{
+                            background: `${category.color}22`,
+                            border: `1px solid ${category.color}50`,
+                            backdropFilter: 'blur(8px)',
+                            boxShadow: `${category.color}15 0px 0px 10px`,
+                          }}
+                        >
+                          <span style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: category.color,
+                            boxShadow: `${category.color} 0px 0px 5px`,
+                            flexShrink: 0,
+                            animation: `livePulse 2s ease-in-out ${i * 0.4}s infinite`,
+                          }} />
+                          <span className="text-xs font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                            {category.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : room.hostId === myId ? (
-              <button
-                onClick={handleStartGame}
-                disabled={room.players.length < 1}
-                className="btn-aero-green w-full px-6 py-4 text-white text-lg font-semibold rounded-xl disabled:opacity-50"
-              >
-                🚀 Lancer la partie
-              </button>
+              <>
+                <button
+                  onClick={handleStartGame}
+                  disabled={room.players.length < 1}
+                  className="btn-aero-green w-full px-6 py-4 text-white text-lg font-semibold rounded-xl disabled:opacity-50"
+                >
+                  🚀 Lancer la partie
+                </button>
+                {room.categories && room.categories.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mt-3">
+                    {room.categories.map((catId) => {
+                      const category = categories.find((c) => c.id === catId);
+                      if (!category) return null;
+                      const icon = ICONS[category.icon] || ICONS.default;
+                      return (
+                        <div
+                          key={catId}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass"
+                          style={{ borderColor: category.color, borderWidth: '1px' }}
+                        >
+                          <span style={{ color: category.color }} className="text-sm">{icon}</span>
+                          <span className="text-white/80 text-sm font-medium">{category.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="glass rounded-xl p-4 text-center">
                 <div className="flex items-center justify-center gap-2 text-white/60">
                   <div className="w-4 h-4 border-2 border-[#7ec8e3] border-t-transparent rounded-full animate-spin" />
                   En attente que l&apos;hôte lance la partie...
                 </div>
+                {room.categories && room.categories.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    {room.categories.map((catId) => {
+                      const category = categories.find((c) => c.id === catId);
+                      if (!category) return null;
+                      const icon = ICONS[category.icon] || ICONS.default;
+                      return (
+                        <div
+                          key={catId}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass"
+                          style={{ borderColor: category.color, borderWidth: '1px' }}
+                        >
+                          <span style={{ color: category.color }} className="text-sm">{icon}</span>
+                          <span className="text-white/80 text-sm font-medium">{category.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -907,6 +993,11 @@ export default function MultiGameRoom() {
       <VolumeSlider onVolumeChange={setVolume} />
       {/* Notification Determinoss */}
       <DeterminossNotif gameStartKey={gameStartKey} />
+      {/* Toasts succès */}
+      <AchievementToast
+        achievements={unlockedAchievements}
+        onDismiss={(code) => setUnlockedAchievements(prev => prev.filter(a => a.code !== code))}
+      />
 
 
       <div className="max-w-7xl mx-auto space-y-4">
@@ -1111,6 +1202,46 @@ export default function MultiGameRoom() {
                     </p>
                   ) : (
                     messages.map((msg, i) => {
+                      // Message de succès débloqué
+                      if (msg.isAchievement) {
+                        return (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '6px 10px', borderRadius: 10, margin: '2px 0',
+                            background: 'linear-gradient(135deg, rgba(74,144,217,0.12) 0%, rgba(126,200,227,0.08) 100%)',
+                            border: '1px solid rgba(126,200,227,0.2)',
+                            backdropFilter: 'blur(8px)',
+                          }}>
+                            {/* Icône emote ou emoji */}
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 7, overflow: 'hidden', flexShrink: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: 'rgba(126,200,227,0.1)',
+                              border: '1px solid rgba(126,200,227,0.2)',
+                              position: 'relative',
+                              boxShadow: msg.achievementImageFile ? '0 0 0 1px rgba(0,0,0,0.2), 0 0 0 2px rgba(255,255,255,0.15)' : 'none',
+                            }}>
+                              {msg.achievementImageFile ? (
+                                <>
+                                  <img src={msg.achievementImageFile} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: 'linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 100%)', borderRadius: '7px 7px 0 0', pointerEvents: 'none' }} />
+                                </>
+                              ) : (
+                                <span style={{ fontSize: 14 }}>{msg.achievementIcon}</span>
+                              )}
+                            </div>
+                            {/* Texte */}
+                            <p style={{ fontSize: 12, lineHeight: 1.3, flex: 1, minWidth: 0 }}>
+                              <span style={{ color: 'rgba(126,200,227,0.9)', fontWeight: 600 }}>{msg.pseudo}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.35)', margin: '0 4px' }}>a débloqué</span>
+                              <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{msg.message}</span>
+                            </p>
+                            {/* Badge */}
+                            <span style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(126,200,227,0.5)', fontWeight: 700, flexShrink: 0 }}>Succès</span>
+                          </div>
+                        );
+                      }
+
                       const pseudoColor = msg.isFromFinder
                         ? 'text-[#4a90d9]'
                         : msg.playerId === myId

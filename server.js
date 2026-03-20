@@ -52,12 +52,88 @@ async function saveGameResult({ userId, score, rank, totalPlayers, tracksFound, 
 
 // Définitions des succès (dupliquées ici pour eviter import ESM)
 const ACHIEVEMENT_DEFS = {
-  first_game: { name: 'Première partie',  description: 'Jouer sa première partie',                      icon: '🎮' },
-  champion:   { name: 'Champion',         description: 'Finir 1er avec au moins 2 joueurs',             icon: '🏆' },
-  perfect:    { name: 'Sans faute',       description: 'Trouver toutes les tracks d\'une partie',       icon: '💯' },
+  first_game:    { name: 'Première partie',   description: 'Jouer sa première partie',                          icon: '🎮' },
+  first_correct: { name: 'Premier sang',      description: 'Trouver sa première bonne réponse',                 icon: '🎯' },
+  emote_used:    { name: 'Expressif',         description: 'Utiliser une emote dans le chat',                   icon: '🎭' },
+  champion:      { name: 'Champion',          description: 'Finir 1er avec au moins 2 joueurs',                 icon: '🏆' },
+  perfect:       { name: 'Sans faute',        description: 'Trouver toutes les tracks d\'une partie',           icon: '💯' },
+  speed_demon:   { name: 'Éclair',            description: 'Trouver une réponse dans les 3 premières secondes', icon: '⚡' },
+  habitue:       { name: 'Habitué',           description: 'Jouer 100 parties',                                 icon: '📅' },
+  veteran:       { name: 'Vétéran',           description: 'Jouer 1000 parties',                                icon: '🎖️' },
+  hat_trick:     { name: 'Hat-trick',         description: 'Finir 1er 3 fois de suite',                         icon: '🔥' },
+  night_owl:     { name: 'Oiseau de nuit',    description: 'Jouer entre minuit et 6h du matin',                 icon: '🦉' },
+  lucky:         { name: 'Chanceux',          description: 'Trouver une réponse après avoir perdu 2 vies',      icon: '🍀' },
+  chatty:        { name: 'Bavard',            description: 'Envoyer 30 messages dans le chat en une partie',    icon: '💬' },
 };
 
-async function checkAndUnlockAchievements(player, { rank, totalPlayers, tracksFound, totalTracks }) {
+async function sanitizeEmotes(message, userId) {
+  const emotePattern = /:([a-zA-Z0-9_]+):/g;
+  if (!emotePattern.test(message)) return message;
+  emotePattern.lastIndex = 0;
+
+  const lockedEmotes = await prisma.emote.findMany({
+    where: { achievementCode: { not: null } },
+    select: { code: true, achievementCode: true },
+  });
+  if (lockedEmotes.length === 0) return message;
+
+  const lockedMap = new Map(lockedEmotes.map(e => [e.code, e.achievementCode]));
+
+  let unlockedAchievements = new Set();
+  if (userId) {
+    const achievements = await prisma.userAchievement.findMany({
+      where: { userId },
+      select: { code: true },
+    });
+    unlockedAchievements = new Set(achievements.map(a => a.code));
+  }
+
+  return message.replace(/:([a-zA-Z0-9_]+):/g, (match, code) => {
+    const required = lockedMap.get(code);
+    if (!required) return match; // emote libre
+    if (unlockedAchievements.has(required)) return match; // débloquée
+    return code; // pas débloquée : on retire les ':'
+  });
+}
+
+async function unlockAchievement(player, code, io, roomCode = null) {
+  if (!player.userId) return false;
+  try {
+    const existing = await prisma.userAchievement.findUnique({
+      where: { userId_code: { userId: player.userId, code } },
+    });
+    if (existing) return false;
+    await prisma.userAchievement.create({ data: { userId: player.userId, code } });
+    console.log(`[ACHIEVEMENT] ${player.pseudo}: ${code}`);
+    if (io && player.id && ACHIEVEMENT_DEFS[code]) {
+      const def = ACHIEVEMENT_DEFS[code];
+      const linkedEmote = await prisma.emote.findFirst({ where: { achievementCode: code }, select: { imageFile: true } });
+      const imageFile = linkedEmote?.imageFile || null;
+      // Notif privée au joueur
+      io.to(player.id).emit('achievement:unlocked', { code, name: def.name, description: def.description, icon: def.icon, imageFile });
+      // Broadcast dans la salle
+      if (roomCode) {
+        io.to(roomCode).emit('chat:message', {
+          pseudo: player.pseudo,
+          message: def.name,
+          isCorrect: false,
+          playerId: player.id,
+          isAchievement: true,
+          achievementIcon: def.icon,
+          achievementImageFile: imageFile,
+          avatarFile: player.avatarFile || null,
+          username: player.username || null,
+        });
+      }
+    }
+    return true;
+  } catch (err) {
+    console.error('[ACHIEVEMENT] Erreur:', err);
+    return false;
+  }
+}
+
+async function checkAndUnlockAchievements(player, { rank, totalPlayers, tracksFound, totalTracks }, io, roomCode = null) {
   if (!player.userId) return;
   try {
     const existing = await prisma.userAchievement.findMany({
@@ -71,14 +147,35 @@ async function checkAndUnlockAchievements(player, { rank, totalPlayers, tracksFo
     if (!have.has('champion') && rank === 1 && totalPlayers >= 2) toUnlock.push('champion');
     if (!have.has('perfect') && tracksFound === totalTracks && totalTracks > 0) toUnlock.push('perfect');
 
+    // Night owl : jouer entre minuit et 6h
+    if (!have.has('night_owl')) {
+      const hour = new Date().getHours();
+      if (hour >= 0 && hour < 6) toUnlock.push('night_owl');
+    }
+
+    // Veteran / Habitué : compter les parties jouées
+    if (!have.has('veteran') || !have.has('habitue')) {
+      const gamesPlayed = await prisma.gameResult.count({ where: { userId: player.userId } });
+      if (!have.has('habitue') && gamesPlayed >= 100) toUnlock.push('habitue');
+      if (!have.has('veteran') && gamesPlayed >= 1000) toUnlock.push('veteran');
+    }
+
+    // Hat-trick : finir 1er 3 fois de suite (avec 2+ joueurs)
+    if (!have.has('hat_trick') && rank === 1 && totalPlayers >= 2) {
+      const last3 = await prisma.gameResult.findMany({
+        where: { userId: player.userId },
+        orderBy: { playedAt: 'desc' },
+        take: 3,
+        select: { rank: true },
+      });
+      if (last3.length === 3 && last3.every(r => r.rank === 1)) toUnlock.push('hat_trick');
+    }
+
     if (toUnlock.length === 0) return;
 
-    await prisma.userAchievement.createMany({
-      data: toUnlock.map(code => ({ userId: player.userId, code })),
-      skipDuplicates: true,
-    });
-
-    console.log(`[ACHIEVEMENT] ${player.pseudo}: ${toUnlock.join(', ')}`);
+    for (const code of toUnlock) {
+      await unlockAchievement(player, code, io, roomCode);
+    }
   } catch (err) {
     console.error('[ACHIEVEMENT] Erreur:', err);
   }
@@ -226,10 +323,12 @@ async function createPublicRoom() {
       isPlaying: false,
       hostId: null, // Pas de host pour la room publique
       tracks: limitedTracks,
-      categories: [], // Toutes les catégories
+      categories: [...new Set(limitedTracks.map(t => t.categoryId))]
       timer: null,
       timeRemaining: 30,
       roundFinders: new Set(), // Joueurs qui ont trouvé ce round
+      playerMisses: {},        // { [socketId]: number } — mauvaises réponses depuis suggestion ce round
+      playerChatCount: {},     // { [socketId]: number } — messages chat cette partie
       deletionTimer: null,
       isPublic: true,
       startCountdown: null,
@@ -505,6 +604,8 @@ async function startPublicGame(room) {
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
+    room.playerMisses = {};
+    room.playerChatCount = {};
     room.categoryStats = {}; // Reset stats de catégories
 
     // Reset scores et états des joueurs
@@ -581,6 +682,7 @@ function startTimerPublic(room) {
 async function nextTrackPublic(room) {
   room.currentTrackIndex++;
   room.roundFinders = new Set();
+  room.playerMisses = {};
   room.players.forEach(p => p.hasFoundThisRound = false);
 
   // Si fin des tracks (25 œuvres), fin de partie
@@ -615,7 +717,7 @@ async function nextTrackPublic(room) {
           totalPlayers: sortedPlayers.length,
           tracksFound: player.tracksFound || 0,
           totalTracks: room.tracks.length,
-        });
+        }, ioInstance, PUBLIC_ROOM_CODE);
       }
     }
 
@@ -850,6 +952,8 @@ app.prepare().then(async () => {
           timer: null,
           timeRemaining: 30,
           roundFinders: new Set(),
+          playerMisses: {},
+          playerChatCount: {},
           deletionTimer: null,
           categoryStats: {}, // Stats par joueur: { playerId: { categoryId: count } }
         };
@@ -1021,6 +1125,8 @@ app.prepare().then(async () => {
         room.isPlaying = true;
         room.currentTrackIndex = 0;
         room.roundFinders = new Set();
+        room.playerMisses = {};
+        room.playerChatCount = {};
         room.categoryStats = {}; // Reset stats de catégories
 
         // Reset scores et états
@@ -1054,7 +1160,7 @@ app.prepare().then(async () => {
     });
 
     // Soumettre une réponse (style Skribbl.io)
-    socket.on('game:answer', (answer) => {
+    socket.on('game:answer', async (answer) => {
       if (!currentRoom || !currentPseudo) return;
       const room = rooms.get(currentRoom);
       if (!room || !room.isPlaying) return;
@@ -1099,9 +1205,10 @@ app.prepare().then(async () => {
       const currentPlayer = room.players.find(p => p.id === socket.id);
       const currentAvatarFile = currentPlayer?.avatarFile || null;
       const currentUsername = currentPlayer?.username || null;
+      const sanitizedAnswer = await sanitizeEmotes(answer, currentPlayer?.userId || null);
       const chatMessage = {
         pseudo: currentPseudo,
-        message: answer,
+        message: sanitizedAnswer,
         isCorrect,
         playerId: socket.id,
         isFromFinder: alreadyFound,
@@ -1128,10 +1235,29 @@ app.prepare().then(async () => {
         if (isFromSuggestion && canAnswer && !alreadyFound) {
           console.log(`[LIVES] ${currentPseudo} perd une vie (mauvaise réponse depuis suggestion)`);
           socket.emit('game:wrong-answer');
+          // Tracker les misses pour le succès "lucky"
+          room.playerMisses[socket.id] = (room.playerMisses[socket.id] || 0) + 1;
         }
 
         // Tous les autres messages (mauvaises réponses, messages après avoir trouvé) : envoyer à tout le monde
         io.to(currentRoom).emit('chat:message', chatMessage);
+
+        // Succès emote_used
+        if (/:([a-zA-Z0-9_]+):/.test(answer) && currentPlayer) {
+          unlockAchievement(currentPlayer, 'emote_used', io, currentRoom);
+        }
+
+        // Succès chatty : compteur cumulatif global
+        if (currentPlayer?.userId) {
+          prisma.user.update({
+            where: { id: currentPlayer.userId },
+            data: { totalChatMessages: { increment: 1 } },
+          }).then(updated => {
+            if (updated.totalChatMessages >= 30) {
+              unlockAchievement(currentPlayer, 'chatty', io, currentRoom);
+            }
+          }).catch(() => {});
+        }
       }
 
       if (isCorrect) {
@@ -1163,6 +1289,19 @@ app.prepare().then(async () => {
           timeRemaining: room.timeRemaining,
           isFirst: isFirstFinder,
         });
+
+        // Succès sur bonne réponse
+        if (currentPlayer) {
+          unlockAchievement(currentPlayer, 'first_correct', io, currentRoom);
+          // Speed demon : réponse dans les 3 premières secondes
+          if (room.timeRemaining >= currentTrack.timeLimit - 3) {
+            unlockAchievement(currentPlayer, 'speed_demon', io, currentRoom);
+          }
+          // Lucky : trouver après 2 vies perdues ce round
+          if ((room.playerMisses[socket.id] || 0) >= 2) {
+            unlockAchievement(currentPlayer, 'lucky', io, currentRoom);
+          }
+        }
 
         // Notification publique à tous (sans révéler la réponse)
         io.to(currentRoom).emit('game:player-found', {
@@ -1375,6 +1514,7 @@ app.prepare().then(async () => {
   async function nextTrack(room, roomCode, io) {
     room.currentTrackIndex++;
     room.roundFinders = new Set();
+    room.playerMisses = {};
     room.players.forEach(p => p.hasFoundThisRound = false);
 
     if (room.currentTrackIndex >= room.tracks.length) {
@@ -1403,7 +1543,7 @@ app.prepare().then(async () => {
           totalPlayers: sortedPlayers.length,
           tracksFound: p.tracksFound || 0,
           totalTracks,
-        });
+        }, io, roomCode);
       }
 
       io.to(roomCode).emit('game:end', {

@@ -8,6 +8,7 @@ interface Emote {
   imageFile: string | null;
 }
 
+
 export default function AdminEmotesPage() {
   const [emotes, setEmotes] = useState<Emote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +102,7 @@ export default function AdminEmotesPage() {
       setSaving(false);
     }
   };
+
 
   const handleDelete = async (id: number) => {
     if (!confirm('Supprimer cette emote ?')) return;

@@ -1,6 +1,17 @@
 export default function UpdatesSidebar() {
   const updates = [
     {
+      date: '20 mars 2026',
+      badge: '✨ Nouveau',
+      badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
+      items: [
+        'Système de succès : 12 achievements à débloquer en jouant',
+        'Notification toast style Steam quand un succès est débloqué',
+        'Emotes liées aux succès : débloquer un succès = débloquer son emote',
+        'Tags de catégories visibles dans le lobby avant le lancement d\'une partie',
+      ],
+    },
+    {
       date: '19 mars 2026',
       badge: '✨ Nouveau',
       badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',

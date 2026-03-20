@@ -71,6 +71,7 @@ export interface ChatMessage {
   isHint?: boolean;
   isAchievement?: boolean;
   achievementIcon?: string;
+  achievementImageFile?: string | null;
   avatarFile?: string | null;
   username?: string | null;
 }

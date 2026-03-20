@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { verifyUserToken } from '@/lib/userAuth';
 import { ACHIEVEMENTS } from '@/lib/achievements';
+import RemoveAchievementButton from '@/components/RemoveAchievementButton';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -27,6 +28,29 @@ export default async function ProfilePage({ params }: Props) {
   const ladder = await prisma.ladderEntry.findUnique({
     where: { pseudo_weekId: { pseudo: normalized, weekId: 'all-time' } },
   });
+
+  // Emotes liées aux achievements (pour afficher l'icône image)
+  const achievementEmotes = await prisma.emote.findMany({
+    where: { achievementCode: { not: null } },
+    select: { achievementCode: true, imageFile: true },
+  });
+  const emoteByAchievement = Object.fromEntries(achievementEmotes.map(e => [e.achievementCode!, e.imageFile]));
+
+  // Progression des succès à barre + rareté
+  const totalGamesPlayed = await prisma.gameResult.count({ where: { userId: user.id } });
+  const totalUsers = await prisma.user.count();
+  const achievementCounts = await prisma.userAchievement.groupBy({
+    by: ['code'],
+    _count: { code: true },
+  });
+  const rarityMap: Record<string, number> = Object.fromEntries(
+    achievementCounts.map(a => [a.code, totalUsers > 0 ? Math.round((a._count.code / totalUsers) * 100) : 0])
+  );
+  const achievementProgress: Record<string, { value: number; max: number }> = {
+    habitue:  { value: Math.min(totalGamesPlayed, 100),  max: 100  },
+    veteran:  { value: Math.min(totalGamesPlayed, 1000), max: 1000 },
+    chatty:   { value: Math.min(user.totalChatMessages, 30), max: 30 },
+  };
 
   const rankedGames = await prisma.gameResult.findMany({
     where: { userId: user.id, roomCode: 'PUBLIC' },
@@ -106,7 +130,12 @@ export default async function ProfilePage({ params }: Props) {
 
       {/* Succès */}
       <div className="w-full max-w-2xl glass rounded-2xl p-6 mb-4">
-        <h2 className="text-[#7ec8e3] font-semibold mb-4">Succès</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[#7ec8e3] font-semibold">Succès</h2>
+          <span className="text-white/40 text-sm">
+            {user.achievements.length} / {Object.keys(ACHIEVEMENTS).length}
+          </span>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           {Object.values(ACHIEVEMENTS).map(def => {
             const unlocked = user.achievements.find(a => a.code === def.code);
@@ -119,13 +148,67 @@ export default async function ProfilePage({ params }: Props) {
                     : 'bg-white/3 border-white/5 opacity-40'
                 }`}
               >
-                <span className="text-3xl">{def.icon}</span>
+                {emoteByAchievement[def.code] ? (
+                  <div style={{
+                    width: 48, height: 48,
+                    borderRadius: 10,
+                    position: 'relative',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden',
+                    boxShadow: unlocked
+                      ? '0 0 0 1.5px rgba(0,0,0,0.25), 0 0 0 2.5px rgba(255,255,255,0.20), 0 2px 6px rgba(0,0,0,0.35)'
+                      : 'none',
+                    filter: unlocked ? 'none' : 'grayscale(1)',
+                    opacity: unlocked ? 1 : 0.3,
+                  }}>
+                    <img src={emoteByAchievement[def.code]!} alt={def.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    {unlocked && (
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0,
+                        height: '50%',
+                        borderRadius: '10px 10px 0 0',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.04) 100%)',
+                        pointerEvents: 'none',
+                      }} />
+                    )}
+                  </div>
+                ) : <span className="text-3xl">{def.icon}</span>}
+
                 <span className={`text-sm font-semibold ${unlocked ? 'text-white' : 'text-white/50'}`}>{def.name}</span>
                 <span className="text-white/40 text-xs leading-tight">{def.description}</span>
+                {rarityMap[def.code] !== undefined && (
+                  <span className={`text-[10px] font-medium ${
+                    rarityMap[def.code] <= 5 ? 'text-yellow-400/70' :
+                    rarityMap[def.code] <= 20 ? 'text-[#7ec8e3]/60' :
+                    'text-white/25'
+                  }`}>
+                    {rarityMap[def.code]}% des joueurs
+                  </span>
+                )}
                 {unlocked && (
                   <span className="text-[#7ec8e3]/60 text-xs mt-0.5">
                     {new Date(unlocked.unlockedAt).toLocaleDateString('fr-FR')}
                   </span>
+                )}
+                {achievementProgress[def.code] && !unlocked && (
+                  <div className="w-full mt-1.5">
+                    <div className="flex justify-between text-[10px] text-white/30 mb-1">
+                      <span>{achievementProgress[def.code].value.toLocaleString('fr-FR')}</span>
+                      <span>{achievementProgress[def.code].max.toLocaleString('fr-FR')}</span>
+                    </div>
+                    <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(achievementProgress[def.code].value / achievementProgress[def.code].max) * 100}%`,
+                          background: 'linear-gradient(90deg, rgba(74,144,217,0.6), rgba(126,200,227,0.8))',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {unlocked && isOwner && (
+                  <RemoveAchievementButton code={def.code} />
                 )}
               </div>
             );

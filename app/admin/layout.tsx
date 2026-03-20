@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/tracks', label: 'Musiques', icon: '🎵' },
   { href: '/admin/users', label: 'Utilisateurs', icon: '👥' },
   { href: '/admin/emotes', label: 'Emotes', icon: '😄' },
+  { href: '/admin/achievements', label: 'Succès', icon: '🏅' },
 ];
 
 export default function AdminLayout({
