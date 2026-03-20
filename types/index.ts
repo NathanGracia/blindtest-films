@@ -68,6 +68,7 @@ export interface ChatMessage {
   isCorrect: boolean;
   playerId: string;
   isFromFinder?: boolean;
+  isLightning?: boolean;
   isHint?: boolean;
   isAchievement?: boolean;
   achievementIcon?: string;

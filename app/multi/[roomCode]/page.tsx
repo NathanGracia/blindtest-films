@@ -891,6 +891,14 @@ export default function MultiGameRoom() {
                 {categories.filter(c => c.rankedEnabled).length > 0 && (
                   <div className="flex flex-col gap-1.5 mt-4">
                     <style>{`
+                      @keyframes lightningEntry {
+                        0% { opacity: 0; transform: translateX(-6px) scaleX(0.96); }
+                        100% { opacity: 1; transform: translateX(0) scaleX(1); }
+                      }
+                      @keyframes lightningShimmer {
+                        0%, 100% { opacity: 0.6; }
+                        50% { opacity: 1; }
+                      }
                       @keyframes livePulse {
                         0%, 100% { opacity: 1; transform: scale(1); }
                         50% { opacity: 0.4; transform: scale(0.7); }
@@ -1251,17 +1259,33 @@ export default function MultiGameRoom() {
                         <div
                           key={i}
                           className={`flex items-center gap-2 ${
-                            msg.isCorrect ? 'bg-green-500/10 border border-green-500/30 rounded-lg px-2 py-1' : 'px-1 py-0.5'
+                            msg.isLightning
+                              ? 'rounded-lg px-2 py-1 relative overflow-hidden'
+                              : msg.isCorrect
+                              ? 'bg-green-500/10 border border-green-500/30 rounded-lg px-2 py-1'
+                              : 'px-1 py-0.5'
                           } ${msg.isFromFinder ? 'opacity-90' : ''}`}
+                          style={msg.isLightning ? {
+                            background: 'linear-gradient(105deg, rgba(255,200,0,0.08) 0%, rgba(255,140,0,0.04) 100%)',
+                            border: '1px solid rgba(255,200,0,0.25)',
+                            boxShadow: '0 0 14px rgba(255,180,0,0.1), inset 0 1px 0 rgba(255,255,255,0.04)',
+                            animation: 'lightningEntry 0.35s cubic-bezier(0.22,1,0.36,1) both',
+                          } : undefined}
                         >
+                          {msg.isLightning && (
+                            <span className="absolute inset-0 pointer-events-none" style={{
+                              background: 'linear-gradient(105deg, rgba(255,220,0,0.1) 0%, transparent 55%)',
+                              animation: 'lightningShimmer 2.5s ease-in-out infinite',
+                            }} />
+                          )}
                           {msg.username ? (
-                            <Link href={`/profile/${msg.username}`} className="shrink-0">
+                            <Link href={`/profile/${msg.username}`} className="shrink-0 relative z-10">
                               <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={32} />
                             </Link>
                           ) : (
-                            <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={32} className="shrink-0" />
+                            <UserAvatar avatarFile={msg.avatarFile} pseudo={msg.pseudo} size={32} className="shrink-0 relative z-10" />
                           )}
-                          <p className="text-base leading-snug min-w-0 break-words" style={{ lineHeight: '32px' }}>
+                          <p className="text-base leading-snug min-w-0 break-words relative z-10" style={{ lineHeight: '32px' }}>
                             {msg.username ? (
                               <Link href={`/profile/${msg.username}`} className={`font-semibold hover:underline ${pseudoColor}`}>
                                 {msg.pseudo}
@@ -1271,10 +1295,23 @@ export default function MultiGameRoom() {
                             )}
                             {msg.isFromFinder && <span className="text-xs mx-0.5" title="A déjà trouvé">👑</span>}
                             <span className="text-white/40 mx-1">:</span>
-                            <span className={msg.isCorrect ? 'text-[#7fba00] font-bold' : 'text-white/80'}>
-                              {renderMessageText(msg.message)}
-                              {msg.isCorrect && <span className="ml-1">✓</span>}
-                            </span>
+                            {msg.isLightning ? (
+                              <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                                a trouvé en moins de 3s !{' '}
+                                <span className="font-black text-xs px-1.5 py-0.5 rounded-md" style={{
+                                  background: 'rgba(255,196,0,0.18)',
+                                  color: '#ffc400',
+                                  border: '1px solid rgba(255,196,0,0.3)',
+                                  textShadow: '0 0 8px rgba(255,200,0,0.5)',
+                                  letterSpacing: '0.03em',
+                                }}>+100</span>
+                              </span>
+                            ) : (
+                              <span className={msg.isCorrect ? 'text-[#7fba00] font-bold' : 'text-white/80'}>
+                                {renderMessageText(msg.message)}
+                                {msg.isCorrect && <span className="ml-1">✓</span>}
+                              </span>
+                            )}
                           </p>
                         </div>
                       );

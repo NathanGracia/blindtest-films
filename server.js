@@ -272,8 +272,11 @@ function levenshteinDistance(str1, str2) {
 }
 
 // Charger les tracks depuis la base de données
-async function loadTracks() {
-  const tracks = await prisma.track.findMany();
+async function loadTracks({ rankedOnly = false } = {}) {
+  const where = rankedOnly
+    ? { category: { rankedEnabled: true } }
+    : {};
+  const tracks = await prisma.track.findMany({ where });
   return tracks.map(track => ({
     ...track,
     acceptedAnswers: JSON.parse(track.acceptedAnswers),
@@ -311,7 +314,7 @@ const rooms = new Map();
 // Créer la room publique permanente
 async function createPublicRoom() {
   try {
-    const allTracks = await loadTracks();
+    const allTracks = await loadTracks({ rankedOnly: true });
 
     // Distribution avec répartition par difficulté
     const limitedTracks = distributeTracksWithDifficulty(allTracks, 25);
@@ -323,7 +326,7 @@ async function createPublicRoom() {
       isPlaying: false,
       hostId: null, // Pas de host pour la room publique
       tracks: limitedTracks,
-      categories: [...new Set(limitedTracks.map(t => t.categoryId))]
+      categories: [...new Set(limitedTracks.map(t => t.categoryId))],
       timer: null,
       timeRemaining: 30,
       roundFinders: new Set(), // Joueurs qui ont trouvé ce round
@@ -597,7 +600,7 @@ async function startPublicGame(room) {
   if (!ioInstance) return;
 
   try {
-    const allTracks = await loadTracks();
+    const allTracks = await loadTracks({ rankedOnly: true });
 
     // Distribution avec répartition par difficulté
     room.tracks = distributeTracksWithDifficulty(allTracks, 25);
@@ -1173,11 +1176,9 @@ app.prepare().then(async () => {
       // Vérifier si la réponse vient d'une suggestion (titre VO ou VF exact)
       const isFromSuggestion = isAnswerFromSuggestion(answer, currentTrack.categoryId);
 
-      console.log(`[ANSWER] ${currentPseudo}: "${answer}" (fromSuggestion: ${isFromSuggestion})`);
 
       // Ne pas valider les réponses si le temps est écoulé (mais permettre le chat)
       const canAnswer = room.timeRemaining > 0;
-      // Ne pas vérifier si déjà trouvé OU si le temps est écoulé
       const isCorrect = canAnswer && !alreadyFound && checkAnswer(answer, currentTrack.acceptedAnswers);
 
       // Vérifier si la réponse est proche (à 2 caractères près) - seulement si le temps est encore actif
@@ -1216,13 +1217,17 @@ app.prepare().then(async () => {
         username: currentUsername,
       };
 
+      // Détecter réponse éclair (moins de 3 secondes)
+      const isLightning = isCorrect && currentTrack && room.timeRemaining >= currentTrack.timeLimit - 3;
+
       // ROUTING DES MESSAGES
       if (isCorrect) {
         // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
         const foundMessage = {
           pseudo: currentPseudo,
-          message: 'a trouvé!',
+          message: isLightning ? 'a trouvé en moins de 3 secondes ! +100' : 'a trouvé !',
           isCorrect: true,
+          isLightning,
           playerId: socket.id,
           isFromFinder: false,
           avatarFile: currentAvatarFile,
@@ -1263,7 +1268,9 @@ app.prepare().then(async () => {
       if (isCorrect) {
         // Calculer le score basé sur le temps restant
         const isFirstFinder = room.roundFinders.size === 0;
-        const scoreEarned = calculateScore(room.timeRemaining, currentTrack.timeLimit, isFirstFinder);
+        const LIGHTNING_BONUS = 100;
+        let scoreEarned = calculateScore(room.timeRemaining, currentTrack.timeLimit, isFirstFinder);
+        if (isLightning) scoreEarned += LIGHTNING_BONUS;
 
         // Ajouter le joueur aux finders
         room.roundFinders.add(socket.id);
@@ -1288,6 +1295,7 @@ app.prepare().then(async () => {
           scoreEarned,
           timeRemaining: room.timeRemaining,
           isFirst: isFirstFinder,
+          isLightning,
         });
 
         // Succès sur bonne réponse
