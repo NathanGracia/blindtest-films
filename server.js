@@ -1231,7 +1231,7 @@ app.prepare().then(async () => {
         // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
         const foundMessage = {
           pseudo: currentPseudo,
-          message: isLightning ? `a trouvé en moins de 3 secondes ! (+${scorePreview})` : `a trouvé ! (+${scorePreview})`,
+          message: isLightning ? `a trouvé en ${currentTrack.timeLimit - room.timeRemaining}s ! (+${scorePreview})` : `a trouvé ! (+${scorePreview})`,
           isCorrect: true,
           isLightning,
           playerId: socket.id,
