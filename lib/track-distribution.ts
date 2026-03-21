@@ -48,9 +48,10 @@ export function distributeTracksEquitably(
     }
   }
 
-  // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité
-  for (let i = 0; i < categories.length && remainingRounds > 0; i++) {
-    const cat = categories[i];
+  // Phase 2: Distribuer le reste aux catégories qui ont encore de la capacité (ordre aléatoire)
+  const shuffledCategories = shuffleArray([...categories]);
+  for (let i = 0; i < shuffledCategories.length && remainingRounds > 0; i++) {
+    const cat = shuffledCategories[i];
     const available = shuffledTracksPerCategory[cat]?.length || 0;
     const alreadyTaken = result.filter(t => t.categoryId === cat).length;
 
