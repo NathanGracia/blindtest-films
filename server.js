@@ -620,6 +620,7 @@ async function startPublicGame(room) {
 
     const currentTrack = room.tracks[room.currentTrackIndex];
     room.timeRemaining = currentTrack.timeLimit;
+    room.roundStartedAt = Date.now();
 
     ioInstance.to(PUBLIC_ROOM_CODE).emit('game:start', {
       trackIndex: room.currentTrackIndex,
@@ -764,6 +765,7 @@ async function nextTrackPublic(room) {
 
   const currentTrack = room.tracks[room.currentTrackIndex];
   room.timeRemaining = currentTrack.timeLimit;
+  room.roundStartedAt = Date.now();
 
   if (ioInstance) {
     ioInstance.to(PUBLIC_ROOM_CODE).emit('game:next', {
@@ -1141,6 +1143,7 @@ app.prepare().then(async () => {
 
         const currentTrack = room.tracks[room.currentTrackIndex];
         room.timeRemaining = currentTrack.timeLimit;
+        room.roundStartedAt = Date.now();
 
         io.to(currentRoom).emit('game:start', {
           trackIndex: room.currentTrackIndex,
@@ -1231,7 +1234,7 @@ app.prepare().then(async () => {
         // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
         const foundMessage = {
           pseudo: currentPseudo,
-          message: isLightning ? `a trouvé en ${currentTrack.timeLimit - room.timeRemaining}s ! (+${scorePreview})` : `a trouvé ! (+${scorePreview})`,
+          message: isLightning ? `a trouvé en ${((Date.now() - (room.roundStartedAt || Date.now())) / 1000).toFixed(3)}s ! (+${scorePreview})` : `a trouvé ! (+${scorePreview})`,
           isCorrect: true,
           isLightning,
           playerId: socket.id,
@@ -1569,6 +1572,7 @@ app.prepare().then(async () => {
 
     const currentTrack = room.tracks[room.currentTrackIndex];
     room.timeRemaining = currentTrack.timeLimit;
+    room.roundStartedAt = Date.now();
 
     io.to(roomCode).emit('game:next', {
       trackIndex: room.currentTrackIndex,

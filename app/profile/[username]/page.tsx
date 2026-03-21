@@ -207,9 +207,6 @@ export default async function ProfilePage({ params }: Props) {
                     </div>
                   </div>
                 )}
-                {unlocked && isOwner && (
-                  <RemoveAchievementButton code={def.code} />
-                )}
               </div>
             );
           })}
