@@ -1222,10 +1222,16 @@ app.prepare().then(async () => {
 
       // ROUTING DES MESSAGES
       if (isCorrect) {
+        // Pré-calculer le score pour l'afficher dans le message
+        const isFirstFinderPreview = room.roundFinders.size === 0;
+        const LIGHTNING_BONUS_PREVIEW = 100;
+        let scorePreview = calculateScore(room.timeRemaining, currentTrack.timeLimit, isFirstFinderPreview);
+        if (isLightning) scorePreview += LIGHTNING_BONUS_PREVIEW;
+
         // Bonne réponse : ne pas afficher le texte, juste "a trouvé!"
         const foundMessage = {
           pseudo: currentPseudo,
-          message: isLightning ? 'a trouvé en moins de 3 secondes ! +100' : 'a trouvé !',
+          message: isLightning ? `a trouvé en moins de 3 secondes ! (+${scorePreview})` : `a trouvé ! (+${scorePreview})`,
           isCorrect: true,
           isLightning,
           playerId: socket.id,
