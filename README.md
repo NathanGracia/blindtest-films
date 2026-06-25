@@ -10,7 +10,7 @@ Application de blindtest musical pour films, séries, jeux vidéo et anime. Styl
 - **Système de vies** : 3 vies par track pour les suggestions automatiques
 - **Autocomplétion intelligente** : Suggestions de réponses en temps réel
 - **Interface Admin** : Gestion des tracks et catégories
-- **Import automatique** : Scripts Python pour importer des médias depuis OMDb et YouTube
+- **Import automatique** : Script Python (`feeder.py`) pour importer des médias depuis YouTube, en local puis vers le VPS
 - **Normalisation audio** : Volume cohérent à -16 LUFS pour tous les tracks
 
 ## 🚀 Installation
@@ -48,14 +48,15 @@ Créer un fichier `.env.local` à la racine :
 # Mot de passe admin (pour l'interface /admin)
 ADMIN_PASSWORD=votre_mot_de_passe
 
-# Clé API OMDb (obtenir gratuitement sur http://www.omdbapi.com/apikey.aspx)
-OMDB_API_KEY=votre_cle_omdb
-
-# URL de l'API (local par défaut)
-API_BASE_URL=http://localhost:3000
+# URL de l'API (local par défaut, port 3001)
+API_BASE_URL=http://localhost:3001
 
 # Token d'import (utilise ADMIN_PASSWORD par défaut)
 IMPORT_API_TOKEN=votre_mot_de_passe
+
+# Optionnel - clé OMDb (http://www.omdbapi.com/apikey.aspx) pour recuperer
+# l'affiche officielle des films au lieu de la miniature YouTube
+OMDB_API_KEY=votre_cle_omdb
 ```
 
 ### 5. Initialiser la base de données
@@ -145,35 +146,31 @@ Si votre réponse est **proche** (distance de Levenshtein ≤ 2 caractères) :
 
 ## 📦 Hydratation de la base de données
 
-### Importer des films
+### Importer des tracks (films, séries, jeux, anime...)
 
-Le projet inclut un système modulaire d'import de médias.
+YouTube bloque les téléchargements depuis les IP datacenter (donc depuis le
+VPS). `scripts/feeder.py` télécharge donc toujours en local (votre PC), puis
+hydrate la BDD locale et/ou celle du VPS. Voir `scripts/CSV_IMPORT.md` pour le
+détail complet.
 
-#### Configuration des films à importer
+#### Préparer un CSV
 
-Éditez `scripts/data/films_list.json` pour ajouter/modifier les films :
-
-```json
-{
-  "version": "1.0",
-  "category": "films",
-  "items": [
-    {
-      "id": "tt0111161",
-      "titleVF": "Les Évadés",
-      "notes": "The Shawshank Redemption"
-    }
-  ]
-}
+```csv
+title,titleVF,youtube_url,category_id
+The Shawshank Redemption,Les Évadés,https://www.youtube.com/watch?v=6hB3S9bIaco,films
+Spirited Away,Le Voyage de Chihiro,,anime
 ```
 
-- `id` : ID IMDb du film (format `ttXXXXXXX`)
-- `titleVF` : Titre français (optionnel)
-- `notes` : Notes/description (optionnel)
+`youtube_url` est optionnel : si vide, le script cherche automatiquement
+`{title} theme soundtrack` sur YouTube.
+
+Pour la catégorie `films`, si `OMDB_API_KEY` est configurée, l'affiche
+officielle OMDb remplace automatiquement la miniature YouTube (meilleure
+qualité). Désactivable avec `--no-omdb-poster`.
 
 #### Lancer l'import
 
-**Important** : Le serveur Next.js doit être lancé avant l'import.
+**Important** : Le serveur Next.js local doit être lancé avant l'import (pour la cible `local`).
 
 Terminal 1 - Lancer le serveur :
 ```bash
@@ -183,59 +180,39 @@ npm run dev
 Terminal 2 - Lancer l'import :
 
 ```bash
-# Importer les 10 premiers films
-python scripts/fixtures.py --categories films --limit 10
+# Hydrate la BDD locale (defaut)
+python scripts/feeder.py data/mon_import.csv
 
-# Importer tous les films
-python scripts/fixtures.py --categories films
+# Avec limite
+python scripts/feeder.py data/mon_import.csv --limit 10
 
-# Importer des catégories spécifiques
-python scripts/fixtures.py --categories films series
+# Hydrate aussi le VPS (upload des fichiers + creation des tracks)
+python scripts/feeder.py data/mon_import.csv --targets local vps
 ```
 
 **Ce que fait le script :**
-1. ✅ Récupère les métadonnées depuis OMDb API
-2. ✅ Télécharge l'image du poster
-3. ✅ Cherche et télécharge l'audio depuis YouTube
-4. ✅ **Normalise automatiquement l'audio à -16 LUFS** (volume cohérent)
-5. ✅ Génère automatiquement les variations de réponses acceptées
-6. ✅ Crée le track dans la base de données
-7. ✅ Skip automatiquement les films déjà importés
+1. ✅ Télécharge l'audio + la miniature depuis YouTube (une seule fois, en local)
+2. ✅ **Normalise automatiquement l'audio à -16 LUFS** (volume cohérent)
+3. ✅ Génère automatiquement les variations de réponses acceptées
+4. ✅ Crée le track dans la/les base(s) de données ciblée(s)
+5. ✅ Skip automatiquement les tracks déjà importés (par cible)
 
 **Résultat :**
-- Audio : `public/audio/nom-du-film.mp3`
-- Image : `public/images/nom-du-film.jpg`
+- Audio : `public/audio/nom-du-track.mp3`
+- Image : `public/images/nom-du-track.jpg`
 - Track créé avec toutes les métadonnées
-
-### Importer d'autres catégories
-
-Le système est modulaire et prêt pour d'autres catégories :
-
-```bash
-# Séries TV (à venir)
-python scripts/fixtures.py --categories series
-
-# Jeux vidéo (à venir)
-python scripts/fixtures.py --categories jeux
-
-# Anime (à venir)
-python scripts/fixtures.py --categories anime
-```
 
 ### Options avancées
 
 ```bash
 # Limiter le nombre d'imports
-python scripts/fixtures.py --categories films --limit 5
+python scripts/feeder.py data/mon_import.csv --limit 5
 
 # Force re-import (ignore les doublons)
-python scripts/fixtures.py --categories films --no-skip-existing
+python scripts/feeder.py data/mon_import.csv --no-skip-existing
 
-# Mode verbose (plus de détails)
-python scripts/fixtures.py --categories films --verbose
-
-# Dry run (prévisualisation sans import)
-python scripts/fixtures.py --categories films --dry-run
+# VPS uniquement (les fichiers restent telecharges en local)
+python scripts/feeder.py data/mon_import.csv --targets vps --remote-url https://blindtest.nathangracia.com
 ```
 
 ## 🔊 Normalisation audio
@@ -255,7 +232,7 @@ Les sources YouTube ont des volumes très hétérogènes. Sans normalisation, ce
 
 ### Auto-normalisation des nouveaux imports
 
-✅ **Tous les nouveaux MP3 sont automatiquement normalisés** lors de l'import via `fixtures.py`.
+✅ **Tous les nouveaux MP3 sont automatiquement normalisés** lors de l'import via `feeder.py`.
 
 Vous verrez ce message dans les logs :
 ```
@@ -268,47 +245,7 @@ Si vous avez déjà des MP3 importés avant cette feature, normalisez-les :
 
 ```bash
 # Normaliser tous les MP3 dans public/audio/
-python scripts/normalize_existing.py
-```
-
-**Ce que fait le script :**
-- ✅ Scan de tous les MP3 dans `public/audio/`
-- ✅ Backup automatique des originaux dans `public/audio/.originals/`
-- ✅ Normalisation à -16 LUFS (standard streaming)
-- ✅ Progress bar en temps réel
-- ✅ Rapport détaillé (processed/failed/skipped)
-
-**Durée estimée :** ~6-12 minutes pour 358 fichiers
-
-### Options de normalisation
-
-```bash
-# Preview sans modifier les fichiers
-python scripts/normalize_existing.py --dry-run
-
-# Target LUFS personnalisé (-14 pour YouTube/Spotify standard)
-python scripts/normalize_existing.py --target-level -14
-
-# Sans backup des originaux (non recommandé)
-python scripts/normalize_existing.py --no-backup
-
-# Verbose (voir les détails de normalisation)
-python scripts/normalize_existing.py --verbose
-
-# Normaliser un dossier spécifique
-python scripts/normalize_existing.py --directory public/audio/test
-```
-
-### Restaurer les originaux
-
-Les fichiers originaux sont sauvegardés dans `public/audio/.originals/` :
-
-```bash
-# Restaurer un fichier spécifique
-cp public/audio/.originals/winx.mp3 public/audio/winx.mp3
-
-# Restaurer tous les fichiers
-cp public/audio/.originals/*.mp3 public/audio/
+python scripts/normalize_all_audio.py
 ```
 
 ## 🎮 Lancement de l'application
@@ -376,19 +313,14 @@ blindtest-films/
 │   └── images/             # Posters (.jpg)
 ├── scripts/                 # Scripts d'import Python
 │   ├── config.py           # Configuration
-│   ├── fixtures.py         # Orchestrateur principal
+│   ├── feeder.py            # Import CSV : telecharge YouTube en local, hydrate BDD locale et/ou VPS
 │   ├── clear_tracks.py     # Script de nettoyage
-│   ├── data/               # Données source
-│   │   └── films_list.json
-│   ├── importers/          # Importers par catégorie
-│   │   ├── base.py
-│   │   └── films.py
+│   ├── data/               # CSV source (title,titleVF,youtube_url,category_id)
 │   └── utils/              # Utilitaires
 │       ├── api_client.py
-│       ├── omdb.py
 │       ├── youtube.py
 │       ├── answers.py
-│       └── files.py
+│       └── csv_parser.py
 └── server.js               # Serveur Socket.IO
 ```
 
@@ -414,18 +346,14 @@ npx prisma db seed
 # 4. Lancer le serveur (terminal 1)
 npm run dev
 
-# 5. Importer des films (terminal 2)
-python scripts/fixtures.py --categories films --limit 10
+# 5. Importer des tracks (terminal 2)
+python scripts/feeder.py data/mon_import.csv --limit 10
 
 # 6. Jouer !
-# Ouvrir http://localhost:3000
+# Ouvrir http://localhost:3001
 ```
 
 ## 🐛 Troubleshooting
-
-### Erreur "OMDB_API_KEY not set"
-
-Solution : Ajoutez votre clé API dans `.env.local`
 
 ### Erreur "401 Unauthorized"
 
@@ -461,7 +389,7 @@ sudo apt install ffmpeg
 python scripts/clear_tracks.py
 
 # Ré-importer
-python scripts/fixtures.py --categories films
+python scripts/feeder.py data/mon_import.csv
 ```
 
 ### Volume audio incohérent
@@ -470,29 +398,20 @@ Si certains MP3 sont trop forts ou trop faibles :
 
 ```bash
 # Normaliser tous les MP3 existants
-python scripts/normalize_existing.py
+python scripts/normalize_all_audio.py
 ```
 
 Les nouveaux imports sont automatiquement normalisés.
 
-## 📝 Ajouter de nouveaux films
+## 📝 Ajouter de nouveaux tracks
 
-1. Trouvez l'ID IMDb sur [IMDb.com](https://www.imdb.com) (format `tt0111161`)
-2. Ajoutez-le dans `scripts/data/films_list.json` :
-
-```json
-{
-  "id": "tt0109830",
-  "titleVF": "Forrest Gump",
-  "notes": "Forrest Gump"
-}
-```
-
-3. Lancez l'import :
+Ajoutez une ligne dans votre CSV (`title,titleVF,youtube_url,category_id`) puis lancez l'import :
 
 ```bash
-python scripts/fixtures.py --categories films
+python scripts/feeder.py data/mon_import.csv
 ```
+
+Voir `scripts/CSV_IMPORT.md` pour le format détaillé et les options (`--targets`, `--no-skip-existing`, etc.).
 
 ## 🔐 Sécurité
 

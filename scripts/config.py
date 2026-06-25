@@ -16,13 +16,13 @@ load_dotenv('.env.local', override=True)  # Load .env.local and override
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # API Configuration
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:3000')
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:3001')
 API_TRACKS_ENDPOINT = f'{API_BASE_URL}/api/import/tracks'  # Use import endpoint for scripts
 API_CATEGORIES_ENDPOINT = f'{API_BASE_URL}/api/categories'
 API_TOKEN = os.getenv('IMPORT_API_TOKEN') or os.getenv('ADMIN_PASSWORD')
 
-# OMDb API Configuration
-OMDB_API_KEY = os.getenv('OMDB_API_KEY')
+# OMDb API Configuration (affiches officielles pour les films)
+OMDB_API_KEY = os.getenv('OMDB_API_KEY') or None
 OMDB_API_URL = 'http://www.omdbapi.com/'
 
 # File paths
@@ -75,16 +75,9 @@ def detect_ffmpeg():
 
 FFMPEG_PATH = detect_ffmpeg()
 
-# Default track settings
-DEFAULT_TIME_LIMIT = 30
-DEFAULT_START_TIME = 0
-
 # Timeouts
 HTTP_TIMEOUT = 30
 YOUTUBE_DOWNLOAD_TIMEOUT = 120
-
-# OMDb rate limiting (free tier: 1 req/sec)
-OMDB_RATE_LIMIT_DELAY = 1.0
 
 def ensure_directories():
     """Ensure required directories exist."""
@@ -94,9 +87,6 @@ def ensure_directories():
 def validate_config():
     """Validate configuration and warn about missing values."""
     warnings = []
-
-    if not OMDB_API_KEY:
-        warnings.append("OMDB_API_KEY not set. Get one from http://www.omdbapi.com/apikey.aspx")
 
     if not FFMPEG_PATH:
         warnings.append("FFmpeg not detected. Download from https://ffmpeg.org/download.html")

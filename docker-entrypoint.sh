@@ -24,8 +24,8 @@ echo ""
 echo "=== Blindtest Films - Pret! ==="
 echo "Serveur accessible sur http://localhost:3000"
 echo ""
-echo "Pour ajouter des tracks, lancez depuis votre PC :"
-echo "  python scripts/fixtures.py --api-url http://VOTRE_SERVEUR:3000"
+echo "Pour ajouter des tracks, lancez depuis votre PC (jamais depuis le VPS - IP datacenter bloquee par YouTube) :"
+echo "  python scripts/feeder.py data/mon_import.csv --targets vps --remote-url http://VOTRE_SERVEUR:3000"
 echo ""
 
 exec node server.js

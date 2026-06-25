@@ -84,28 +84,6 @@ class TrackAPIClient:
             print(f"Error fetching tracks: {e}")
             return []
 
-    def get_track(self, track_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Get a single track by ID.
-
-        Args:
-            track_id: Track ID
-
-        Returns:
-            Track dictionary or None if not found
-        """
-        try:
-            url = f'{self.tracks_endpoint}/{track_id}'
-            response = self._request('GET', url)
-            return response.json()
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return None
-            raise
-        except Exception as e:
-            print(f"Error fetching track {track_id}: {e}")
-            return None
-
     def create_track(self, track_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Create a new track.
@@ -146,30 +124,6 @@ class TrackAPIClient:
             print(f"Error creating track: {e}")
             return None
 
-    def update_track(self, track_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Update an existing track.
-
-        Args:
-            track_id: Track ID
-            updates: Dictionary of fields to update
-
-        Returns:
-            Updated track dictionary or None on failure
-        """
-        try:
-            url = f'{self.tracks_endpoint}/{track_id}'
-            response = self._request(
-                'PUT',
-                url,
-                json=updates,
-                headers={'Content-Type': 'application/json'}
-            )
-            return response.json()
-        except Exception as e:
-            print(f"Error updating track {track_id}: {e}")
-            return None
-
     def delete_track(self, track_id: int) -> bool:
         """
         Delete a track.
@@ -188,23 +142,6 @@ class TrackAPIClient:
             print(f"Error deleting track {track_id}: {e}")
             return False
 
-    def track_exists(self, title: str) -> bool:
-        """
-        Check if a track with the given title exists.
-
-        Args:
-            title: Track title to check (case-insensitive)
-
-        Returns:
-            True if track exists, False otherwise
-        """
-        tracks = self.get_tracks()
-        normalized_title = title.lower().strip()
-        return any(
-            track.get('title', '').lower().strip() == normalized_title
-            for track in tracks
-        )
-
     def get_categories(self) -> List[Dict[str, Any]]:
         """
         Get all categories.
@@ -218,17 +155,3 @@ class TrackAPIClient:
         except Exception as e:
             print(f"Error fetching categories: {e}")
             return []
-
-    def validate_connection(self) -> bool:
-        """
-        Validate API connection.
-
-        Returns:
-            True if API is accessible, False otherwise
-        """
-        try:
-            self.get_categories()
-            return True
-        except Exception as e:
-            print(f"API connection failed: {e}")
-            return False

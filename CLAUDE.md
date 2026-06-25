@@ -21,10 +21,11 @@ npx prisma studio        # Interface graphique DB (localhost:5555)
 npx prisma migrate dev   # Creer migration
 npx prisma db seed       # Init categories
 
-# Import de contenu (Python)
-python scripts/fixtures.py --categories films              # Importer films
-python scripts/fixtures.py --categories films --limit 10   # Limiter
-python scripts/clear_tracks.py                             # Vider tracks
+# Import de contenu (Python) - voir scripts/CSV_IMPORT.md
+python scripts/feeder.py data/mon_import.csv                       # Hydrate la BDD locale (telecharge YouTube en local)
+python scripts/feeder.py data/mon_import.csv --limit 10            # Limiter
+python scripts/feeder.py data/mon_import.csv --targets local vps   # Hydrate aussi le VPS
+python scripts/clear_tracks.py                                     # Vider tracks
 
 # Gestion des utilisateurs
 node scripts/make_admin.js <username>   # Passer un user en admin (prod)
@@ -79,10 +80,11 @@ blindtest-films/
 │   └── avatars/                # Photos de profil uploadées
 │
 ├── scripts/                    # Import Python + utilitaires Node
-│   ├── fixtures.py             # Orchestrateur principal
-│   ├── data/films_list.json    # Liste films a importer
-│   ├── utils/                  # OMDb, YouTube, answers
-│   └── make_admin.js           # Promouvoir un user en admin
+│   ├── feeder.py                # Import CSV : telecharge YouTube en local, hydrate BDD locale et/ou VPS
+│   ├── clear_tracks.py          # Vider tous les tracks
+│   ├── data/                    # CSV source (title,titleVF,youtube_url,category_id)
+│   ├── utils/                   # YouTube, answers, csv_parser, api_client
+│   └── make_admin.js            # Promouvoir un user en admin
 │
 ├── server.js                   # Serveur Node + Socket.IO
 ├── middleware.ts               # Protection routes admin
@@ -335,8 +337,8 @@ POST       /api/auth/login                 # Connexion admin
 ```env
 DATABASE_URL="file:./dev.db"
 ADMIN_PASSWORD=xxx           # Mot de passe interface admin
-OMDB_API_KEY=xxx             # API OMDb (metadonnees films)
 IMPORT_API_TOKEN=xxx         # Token scripts Python (defaut: ADMIN_PASSWORD)
+OMDB_API_KEY=xxx             # Optionnel - affiches officielles pour la categorie "films" (scripts/feeder.py)
 ```
 
 ---
