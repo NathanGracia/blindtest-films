@@ -25,7 +25,8 @@ export default function Home() {
   const [roomCode, setRoomCode] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRounds, setSelectedRounds] = useState(25);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
+  const [selectedAnswerTime, setSelectedAnswerTime] = useState(30);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -68,8 +69,23 @@ export default function Home() {
       }
     }
 
-    const savedDifficulty = sessionStorage.getItem('blindtoss_difficulty');
-    if (savedDifficulty) setSelectedDifficulty(savedDifficulty);
+    const savedAnswerTime = sessionStorage.getItem('blindtoss_answer_time');
+    if (savedAnswerTime) {
+      const t = parseInt(savedAnswerTime, 10);
+      if (!isNaN(t)) {
+        setSelectedAnswerTime(Math.min(45, Math.max(3, t)));
+      }
+    }
+
+    const savedDifficulties = sessionStorage.getItem('blindtoss_difficulties');
+    if (savedDifficulties) {
+      try {
+        const arr = JSON.parse(savedDifficulties);
+        if (Array.isArray(arr)) {
+          setSelectedDifficulties(arr.filter((d: string) => ['easy', 'medium', 'hard'].includes(d)));
+        }
+      } catch {}
+    }
   }, []);
 
   const handleSelectionChange = useCallback((selected: string[]) => {
@@ -80,6 +96,24 @@ export default function Home() {
   const handleRoundsChange = useCallback((rounds: number) => {
     setSelectedRounds(rounds);
     sessionStorage.setItem('blindtoss_rounds', rounds.toString());
+  }, []);
+
+  const handleAnswerTimeChange = useCallback((time: number) => {
+    setSelectedAnswerTime(time);
+    sessionStorage.setItem('blindtoss_answer_time', time.toString());
+  }, []);
+
+  // Difficulté multi-sélection. Liste vide = toutes les difficultés.
+  const toggleDifficulty = useCallback((value: string) => {
+    setSelectedDifficulties((prev) => {
+      const next = value === ''
+        ? [] // "Tout" réinitialise (= toutes)
+        : prev.includes(value)
+          ? prev.filter((d) => d !== value)
+          : [...prev, value];
+      sessionStorage.setItem('blindtoss_difficulties', JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const handleCreatePrivate = () => {
@@ -103,7 +137,7 @@ export default function Home() {
       setIsLoading(false);
     });
 
-    socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, selectedDifficulty || null, (code: string | null, errorMsg?: string) => {
+    socket.emit('room:create', pseudo.trim(), selectedCategories, selectedRounds, selectedDifficulties, selectedAnswerTime, (code: string | null, errorMsg?: string) => {
       if (code) {
         sessionStorage.setItem('blindtoss_pseudo', pseudo.trim());
         try { sessionStorage.setItem('blindtoss_created_room', code); } catch {}
@@ -220,6 +254,8 @@ export default function Home() {
               initialSelection={selectedCategories.length > 0 ? selectedCategories : undefined}
               onRoundsChange={handleRoundsChange}
               initialRounds={selectedRounds}
+              onAnswerTimeChange={handleAnswerTimeChange}
+              initialAnswerTime={selectedAnswerTime}
             />
           </div>
 
@@ -252,7 +288,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Sélecteur de difficulté (rooms privées) */}
+          {/* Sélecteur de difficulté (rooms privées) — multi-sélection */}
           <div className="mb-4 glass rounded-xl p-4">
             <label className="block text-[#7ec8e3] text-sm mb-3 font-semibold text-left">
               Difficulté (partie privée)
@@ -263,31 +299,33 @@ export default function Home() {
                 { value: 'easy', label: 'Facile', color: '#7fba00' },
                 { value: 'medium', label: 'Moyen', color: '#f5a623' },
                 { value: 'hard', label: 'Difficile', color: '#e8445a' },
-              ].map(({ value, label, color }) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setSelectedDifficulty(value);
-                    sessionStorage.setItem('blindtoss_difficulty', value);
-                  }}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2 ${
-                    selectedDifficulty === value
-                      ? 'text-white'
-                      : 'text-white/50 border-white/10 hover:border-white/30'
-                  }`}
-                  style={selectedDifficulty === value && color ? {
-                    backgroundColor: `${color}25`,
-                    borderColor: color,
-                    color,
-                  } : selectedDifficulty === value ? {
-                    backgroundColor: 'rgba(126,200,227,0.2)',
-                    borderColor: '#7ec8e3',
-                    color: '#7ec8e3',
-                  } : {}}
-                >
-                  {label}
-                </button>
-              ))}
+              ].map(({ value, label, color }) => {
+                const isActive = value === ''
+                  ? selectedDifficulties.length === 0
+                  : selectedDifficulties.includes(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleDifficulty(value)}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2 ${
+                      isActive
+                        ? 'text-white'
+                        : 'text-white/50 border-white/10 hover:border-white/30'
+                    }`}
+                    style={isActive && color ? {
+                      backgroundColor: `${color}25`,
+                      borderColor: color,
+                      color,
+                    } : isActive ? {
+                      backgroundColor: 'rgba(126,200,227,0.2)',
+                      borderColor: '#7ec8e3',
+                      color: '#7ec8e3',
+                    } : {}}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

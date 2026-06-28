@@ -1,6 +1,16 @@
 export default function UpdatesSidebar() {
   const updates = [
     {
+      date: '28 juin 2026',
+      badge: '✨ Nouveau',
+      badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',
+      items: [
+        'Temps de réponse réglable en partie privée (de 3 à 45 s, 30 par défaut)',
+        'Difficulté multi-sélection : combine Facile + Moyen + Difficile au choix',
+        'Ranked : les suggestions fonctionnent enfin sur toutes les catégories',
+      ],
+    },
+    {
       date: '20 mars 2026',
       badge: '✨ Nouveau',
       badgeColor: 'text-[#7ec8e3] bg-[#7ec8e3]/15',

@@ -192,9 +192,11 @@ export default function MultiGameRoom() {
           }
           setRoom(state);
 
-          // Charger les réponses disponibles ([] = toutes les catégories pour room publique)
+          // Charger les réponses disponibles. En room publique (ranked), le pool
+          // doit couvrir TOUTES les catégories jouables : room.categories est un
+          // échantillon figé (souvent ["films"]) et chaque partie est redistribuée.
           if (state.categories !== undefined) {
-            loadAnswers(state.categories);
+            loadAnswers(state.isPublic ? [] : state.categories);
           }
 
           if (state.isPlaying && state.currentTrack) {
@@ -227,9 +229,11 @@ export default function MultiGameRoom() {
             }
             setRoom(state);
 
-            // Charger les réponses disponibles ([] = toutes les catégories pour room publique)
+            // Charger les réponses disponibles. En room publique (ranked), le pool
+            // doit couvrir TOUTES les catégories jouables : room.categories est un
+            // échantillon figé (souvent ["films"]) et chaque partie est redistribuée.
             if (state.categories !== undefined) {
-              loadAnswers(state.categories);
+              loadAnswers(state.isPublic ? [] : state.categories);
             }
 
             if (state.isPlaying && state.currentTrack) {

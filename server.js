@@ -604,6 +604,8 @@ async function startPublicGame(room) {
 
     // Distribution avec répartition par difficulté
     room.tracks = distributeTracksWithDifficulty(allTracks, 25);
+    // Garder room.categories cohérent avec la distribution réelle de cette partie
+    room.categories = [...new Set(room.tracks.map(t => t.categoryId))];
     room.currentTrackIndex = 0;
     room.isPlaying = true;
     room.roundFinders = new Set();
@@ -862,23 +864,42 @@ app.prepare().then(async () => {
     }
 
     // Créer une room
-    socket.on('room:create', async (pseudo, categories, maxRounds, difficulty, callback) => {
+    socket.on('room:create', async (pseudo, categories, maxRounds, difficulty, answerTime, callback) => {
       // Backward compatibility
+      if (typeof answerTime === 'function') {
+        callback = answerTime;
+        answerTime = null;
+      }
       if (typeof difficulty === 'function') {
         callback = difficulty;
         difficulty = null;
+        answerTime = null;
       }
       if (typeof maxRounds === 'function') {
         callback = maxRounds;
         maxRounds = null;
         difficulty = null;
+        answerTime = null;
       }
       if (typeof categories === 'function') {
         callback = categories;
         categories = null;
         maxRounds = null;
         difficulty = null;
+        answerTime = null;
       }
+
+      // Temps de réponse personnalisé (partie privée) : clamp 3–45s, défaut tracks sinon
+      let answerTimeOverride = null;
+      if (typeof answerTime === 'number' && !isNaN(answerTime)) {
+        answerTimeOverride = Math.min(45, Math.max(3, Math.round(answerTime)));
+      }
+
+      // Difficulté(s) : accepte un tableau (multi-sélection) ou une string (anciens clients).
+      // Liste vide = toutes les difficultés.
+      const VALID_DIFFICULTIES = ['easy', 'medium', 'hard'];
+      const difficultyList = (Array.isArray(difficulty) ? difficulty : (difficulty ? [difficulty] : []))
+        .filter(d => VALID_DIFFICULTIES.includes(d));
 
       // Vérifier que callback est une fonction
       if (typeof callback !== 'function') {
@@ -904,11 +925,11 @@ app.prepare().then(async () => {
           code = generateRoomCode();
         }
 
-        // Charger et filtrer les tracks par catégorie puis par difficulté
+        // Charger et filtrer les tracks par catégorie puis par difficulté(s)
         const allTracks = await loadTracks();
         let filteredTracks = filterTracksByCategories(allTracks, categories);
-        if (difficulty) {
-          filteredTracks = filteredTracks.filter(t => t.difficulty === difficulty);
+        if (difficultyList.length > 0) {
+          filteredTracks = filteredTracks.filter(t => difficultyList.includes(t.difficulty));
         }
 
         if (filteredTracks.length === 0) {
@@ -942,6 +963,12 @@ app.prepare().then(async () => {
           finalTracks = shuffleArray(filteredTracks);
         }
 
+        // Appliquer le temps de réponse choisi à toutes les tracks de la room
+        // (copies propres à la room, donc sans effet de bord sur le cache global)
+        if (answerTimeOverride !== null) {
+          finalTracks = finalTracks.map(t => ({ ...t, timeLimit: answerTimeOverride }));
+        }
+
         const { username: userUsername, displayName: userDisplayName, avatarFile: userAvatarFile } = await displayNamePromise;
         const effectivePseudo = userDisplayName || pseudo;
         const room = {
@@ -953,9 +980,10 @@ app.prepare().then(async () => {
           tracks: finalTracks,
           categories: categories || [],
           maxRounds: maxRounds || null,
-          difficulty: difficulty || null,
+          difficulties: difficultyList,
+          answerTime: answerTimeOverride,
           timer: null,
-          timeRemaining: 30,
+          timeRemaining: answerTimeOverride || 30,
           roundFinders: new Set(),
           playerMisses: {},
           playerChatCount: {},
@@ -1096,8 +1124,8 @@ app.prepare().then(async () => {
         // Recharger et refiltrer les tracks
         const allTracks = await loadTracks();
         let filteredTracks = filterTracksByCategories(allTracks, room.categories);
-        if (room.difficulty) {
-          filteredTracks = filteredTracks.filter(t => t.difficulty === room.difficulty);
+        if (room.difficulties && room.difficulties.length > 0) {
+          filteredTracks = filteredTracks.filter(t => room.difficulties.includes(t.difficulty));
         }
 
         // Respecter maxRounds si défini
@@ -1124,6 +1152,11 @@ app.prepare().then(async () => {
           );
         } else {
           finalTracks = shuffleArray(filteredTracks);
+        }
+
+        // Réappliquer le temps de réponse personnalisé (game:start recharge les tracks)
+        if (room.answerTime) {
+          finalTracks = finalTracks.map(t => ({ ...t, timeLimit: room.answerTime }));
         }
 
         room.tracks = finalTracks;
