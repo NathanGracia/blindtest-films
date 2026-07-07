@@ -15,7 +15,6 @@ interface User {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/users')
@@ -23,20 +22,6 @@ export default function AdminUsersPage() {
       .then(setUsers)
       .finally(() => setLoading(false));
   }, []);
-
-  const toggleAdmin = async (user: User) => {
-    setToggling(user.id);
-    const res = await fetch(`/api/admin/users/${user.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isAdmin: !user.isAdmin }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, isAdmin: updated.isAdmin } : u));
-    }
-    setToggling(null);
-  };
 
   if (loading) {
     return (
@@ -51,11 +36,28 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Utilisateurs</h2>
-        <p className="text-white/60">{users.length} compte{users.length > 1 ? 's' : ''} enregistré{users.length > 1 ? 's' : ''}</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Utilisateurs</h2>
+          <p className="text-white/60">{users.length} compte{users.length > 1 ? 's' : ''} enregistré{users.length > 1 ? 's' : ''}</p>
+        </div>
+        <a
+          href="https://cooloss.nathangracia.com/admin"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-[#7ec8e3] hover:text-white transition-colors"
+        >
+          Gérer les comptes (rôle, mot de passe) sur cooloss →
+        </a>
       </div>
 
+      {/*
+        Liste en lecture seule : le compte (username/displayName/avatar/rôle)
+        vit sur cooloss, cette table n'est qu'un miroir local (voir
+        lib/sharedAuth.ts). Toggle admin retiré — modifier isAdmin ici ne
+        changeait que la copie locale, écrasée au prochain login de l'user
+        depuis les claims cooloss, donc silencieusement sans effet réel.
+      */}
       <div className="glass rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
@@ -64,7 +66,6 @@ export default function AdminUsersPage() {
               <th className="text-left p-4 text-white/60 font-medium">Identifiant</th>
               <th className="text-left p-4 text-white/60 font-medium">Membre depuis</th>
               <th className="text-left p-4 text-white/60 font-medium">Rôle</th>
-              <th className="text-right p-4 text-white/60 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -92,19 +93,6 @@ export default function AdminUsersPage() {
                   ) : (
                     <span className="text-white/30 text-sm">Membre</span>
                   )}
-                </td>
-                <td className="p-4 text-right">
-                  <button
-                    onClick={() => toggleAdmin(user)}
-                    disabled={toggling === user.id}
-                    className={`px-3 py-1 text-sm rounded-lg transition-all disabled:opacity-50 ${
-                      user.isAdmin
-                        ? 'text-red-400/70 hover:text-red-400 transition-colors'
-                        : 'text-[#7ec8e3]/70 hover:text-[#7ec8e3] transition-colors'
-                    }`}
-                  >
-                    {toggling === user.id ? '...' : user.isAdmin ? 'Retirer admin' : 'Passer admin'}
-                  </button>
                 </td>
               </tr>
             ))}

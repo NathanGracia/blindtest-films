@@ -93,45 +93,48 @@ blindtest-films/
 
 ---
 
-## Système de comptes utilisateurs
+## Système de comptes utilisateurs — géré par cooloss
+
+**Le compte (login, mot de passe, avatar, displayName, isAdmin) n'est plus géré ici.** Depuis juillet 2026, l'identité est centralisée dans une app dédiée, **cooloss** (`https://cooloss.nathangracia.com`, repo `NathanGracia/cooloss`), partagée avec Memoss et toute future app "-oss". Voir `~/docs/compte-unifie-cooloss.md` sur le VPS pour l'architecture complète du système partagé — cette section ne couvre que ce qui reste spécifique à Blindtoss.
 
 ### Vue d'ensemble
 
-Les joueurs peuvent créer un compte (login + mot de passe) pour sauvegarder leurs scores, avoir un profil public et une photo de profil. Les guests peuvent toujours jouer sans compte.
+Se connecter sur cooloss (ou sur n'importe quelle app "-oss") connecte automatiquement partout ailleurs, via un cookie partagé sur `.nathangracia.com`. Les guests peuvent toujours jouer sans compte, comme avant.
 
 ### Authentification
 
-- **Token** : format `userId:expiresAt:hmac` signé HMAC-SHA256 avec `ADMIN_PASSWORD` comme secret
-- **Cookie** : `blindtoss_user_session` (httpOnly, 30 jours)
-- **Hash mdp** : Node.js `crypto.scrypt` (pas bcryptjs — incompatible ESM avec Next.js 16)
-- **Fichier** : `lib/userAuth.ts` — `signUserToken`, `verifyUserToken`, `hashPassword`, `comparePassword`, `getCurrentUser`
+- **Token** : cookie `nathangracia_session`, format `<payload base64url>.<hmac hex>`, HMAC-SHA256 signé avec `SHARED_SESSION_SECRET` (secret dédié, distinct de `ADMIN_PASSWORD`). Payload : `{ uid, username, displayName, isAdmin, avatarFile, exp }`.
+- **Fichiers** :
+  - `lib/sharedAuth.ts` (runtime Node, route handlers) — vérifie le cookie et fait un **upsert-miroir** dans la table `User` locale à chaque requête authentifiée (`getCurrentUser()`, `getCurrentUserId()`).
+  - `lib/sharedAuthEdge.ts` (runtime Edge, `middleware.ts` uniquement) — même vérification en Web Crypto (`crypto.subtle`), pas de DB, juste pour checker `isAdmin` sur `/admin/*`.
+- **Pourquoi un miroir local** : `GameResult`/`UserAchievement`/`UserTrackNote` ont de vraies FK SQLite vers `User.id`, et SQLite ne supporte pas les FK inter-bases — la ligne doit exister localement même si cooloss est la source de vérité. `User.passwordHash` local n'est plus jamais lu, juste présent pour satisfaire la contrainte NOT NULL du schéma (toujours `''`).
 
-### Routes API utilisateur
+### Routes API utilisateur restantes
 
 ```
-POST /api/user/register     # Créer un compte
-POST /api/user/login        # Connexion (pose blindtoss_user_session + blindtoss_admin_session si isAdmin)
-POST /api/user/logout       # Déconnexion (efface les deux cookies)
-GET  /api/user/me           # Utilisateur courant (id, username, displayName, avatarFile, isAdmin)
-PATCH /api/user/profile     # Modifier displayName et/ou mot de passe
-POST /api/user/avatar       # Uploader une photo de profil (JPG/PNG/WebP, max 5 Mo)
+POST /api/user/logout       # Efface le cookie partagé (Domain=.nathangracia.com) — fonctionne
+                             # localement, n'importe quel sous-domaine peut clear ce cookie
+GET  /api/user/me           # Utilisateur courant (mirroré), pour affichage côté client
 ```
+
+Login/register/changement de mot de passe/avatar/displayName : **tout sur cooloss**, plus aucune route locale (`/api/user/login`, `register`, `avatar`, `PATCH /api/user/profile` supprimées).
 
 ### Profils
 
-- **URL publique** : `/profile/[username]` — stats ladder, historique des 20 dernières parties
-- **Édition** : `/profile/edit` — pseudo affiché, mot de passe, photo de profil
-- **Composant avatar** : `components/UserAvatar.tsx` — carré arrondi style Vista, couleur pastel déterministe si pas de photo, reflet vitré CSS
+- **URL publique** : `/profile/[username]` — stats ladder, historique des 20 dernières parties (données locales, inchangé)
+- **Édition** : lien direct vers `https://cooloss.nathangracia.com/profile/edit` (avatar, displayName, mot de passe) — plus de page locale
+- **Composant avatar** : `components/UserAvatar.tsx` — inchangé, `avatarFile` est maintenant toujours une URL absolue (`https://cooloss.nathangracia.com/avatars/...`)
 
 ### Intégration en jeu (server.js)
 
-Au moment de la connexion Socket.IO, le cookie est lu et vérifié (synchrone). La DB est interrogée en parallèle via `displayNamePromise` (pattern non-bloquant) pour récupérer `displayName` et `avatarFile`. Ces données sont stockées dans l'objet `player` et incluses dans tous les events (`room:state`, `room:player-joined`, `chat:message`).
+Au moment de la connexion Socket.IO, le cookie `nathangracia_session` est lu et vérifié (synchrone, HMAC-SHA256 avec `SHARED_SESSION_SECRET`). Le miroir local (`prisma.user.upsert`) est fait en parallèle via `displayNamePromise` (pattern non-bloquant, inchangé) pour récupérer `displayName`/`avatarFile` à jour. Ces données sont stockées dans l'objet `player` et incluses dans tous les events (`room:state`, `room:player-joined`, `chat:message`).
 
 ```js
 // Pattern clé — NE PAS mettre await avant l'enregistrement des handlers
-let displayNamePromise = Promise.resolve({ displayName: null, avatarFile: null });
+let displayNamePromise = Promise.resolve({ username: null, displayName: null, avatarFile: null });
 if (tokenValide) {
-  displayNamePromise = prisma.user.findUnique({ select: { displayName, avatarFile } });
+  displayNamePromise = prisma.user.upsert({ where: { id: claims.uid }, update: {...}, create: {...} })
+    .then(u => ({ username: u.username, displayName: u.displayName, avatarFile: u.avatarFile }));
 }
 socket.on('room:join', async (...) => {
   const { displayName, avatarFile } = await displayNamePromise; // await ICI seulement
@@ -140,10 +143,10 @@ socket.on('room:join', async (...) => {
 
 ### Système admin utilisateurs
 
-- **Champ** : `User.isAdmin` (Boolean, default false)
-- **Accès back-office** : à la connexion, si `isAdmin: true` → cookie `blindtoss_admin_session` posé automatiquement
-- **Interface** : `/admin/users` — tableau des comptes avec bouton "Passer admin" / "Retirer admin"
-- **En production** : `node scripts/make_admin.js <username>` après création du compte
+- **Champ** : `User.isAdmin` — géré sur **cooloss** (`https://cooloss.nathangracia.com/admin`), pas ici. Le flag arrive dans le token à chaque login et se propage au miroir local automatiquement.
+- **Accès back-office local** : `middleware.ts` checke `claims.isAdmin` (via `lib/sharedAuthEdge.ts`) sur `/admin/*` et `/api/admin/*` — pas de cookie admin séparé.
+- **`/admin/users`** : liste en lecture seule (miroir local) — toggle admin retiré (modifiait la copie locale seulement, écrasée au login suivant). Lien vers cooloss pour la vraie gestion.
+- **`scripts/make_admin.js` supprimé** — cette action se fait sur cooloss maintenant.
 
 ---
 
@@ -363,6 +366,28 @@ OMDB_API_KEY=xxx             # Optionnel - affiches officielles pour la categori
 6. **Port dev** : 3001 (pas 3000, pris par un autre projet)
 7. **/api/user/me** retourne toujours HTTP 200 — tester `data.user !== null` pour savoir si connecté
 8. **Notes** : flush forcé sur `game:start` ET `game:end` via `noteDebounceRef` + `trackNotesRef`
+9. **Serving des médias uploadés à chaud** : voir section dédiée ci-dessous — règle volume Docker **+** `location` Nginx, sinon 404.
+
+---
+
+## Serving des médias uploadés (audio / images / emotes / avatars)
+
+⚠️ **Next.js en mode standalone indexe `public/` au boot et ne sert JAMAIS les fichiers ajoutés au volume après le démarrage du conteneur** → tout fichier uploadé/poussé à chaud renvoie **404** sur son URL statique `/<dossier>/<fichier>`.
+
+C'est pour ça que les médias **ne sont PAS servis par Next** mais par **Nginx en frontal**, directement depuis le disque. Tout dossier de médias uploadés à l'exécution doit avoir **les deux** :
+
+1. **Un volume Docker** dans `docker-compose.yml` (sinon l'écriture du conteneur ne persiste pas sur le host) :
+   `./public/audio`, `./public/images`, `./public/emotes`, `./public/avatars` (+ `./prisma`).
+2. **Un bloc `location` dans le vhost Nginx** `/etc/nginx/sites-available/blindtoss` (root `/opt/blindtest-films/public`, cache 30j) :
+   `location /audio/`, `/images/`, `/emotes/`, `/avatars/`.
+
+> **Règle à retenir : tout nouveau dossier de médias uploadés à chaud = (1) volume Docker + (2) `location` Nginx. Aucun code applicatif n'est nécessaire** (la valeur en DB est l'URL statique, ex. `avatarFile = /avatars/<file>`, servie par Nginx).
+>
+> Ne PAS résoudre ça avec une route API Next qui stream le fichier : la convention du projet est Nginx. (`/api/audio/[id]` existe pour des raisons historiques mais n'est pas le pattern cible.)
+
+**Important** : `docker-compose.yml` (version Nginx, sans Caddy) et le vhost Nginx sont **modifiés localement sur le VPS et volontairement NON commités** (le repo garde la version Caddy). Ces deux fichiers vivent uniquement sur le serveur — ne pas committer.
+
+Cas réel (26/06/2026) — upload de photo de profil cassé : il manquait à la fois le volume `./public/avatars` et le `location /avatars/`. Fix = ajout des deux, aucun changement de code.
 
 ---
 
