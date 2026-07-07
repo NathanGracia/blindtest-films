@@ -900,15 +900,16 @@ app.prepare().then(async () => {
               // pattern non-bloquant que l'ancien code (voir CLAUDE.md).
               displayNamePromise = prisma.user.upsert({
                 where: { id: claims.uid },
-                update: { username: claims.username, avatarFile: claims.avatarFile, isAdmin: claims.isAdmin },
+                update: { username: claims.username, displayName: claims.displayName, avatarFile: claims.avatarFile, isAdmin: claims.isAdmin },
                 create: {
                   id: claims.uid,
                   username: claims.username,
+                  displayName: claims.displayName,
                   avatarFile: claims.avatarFile,
                   isAdmin: claims.isAdmin,
                   passwordHash: '',
                 },
-              }).then(u => ({ username: u.username, displayName: u.displayName, avatarFile: u.avatarFile })).catch(() => ({ username: claims.username, displayName: null, avatarFile: claims.avatarFile }));
+              }).then(u => ({ username: u.username, displayName: u.displayName, avatarFile: u.avatarFile })).catch(() => ({ username: claims.username, displayName: claims.displayName, avatarFile: claims.avatarFile }));
             }
           }
         }

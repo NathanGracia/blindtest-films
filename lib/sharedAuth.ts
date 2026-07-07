@@ -19,6 +19,7 @@ const SHARED_SESSION_COOKIE = 'nathangracia_session';
 export interface SharedClaims {
   uid: number;
   username: string;
+  displayName: string | null;
   isAdmin: boolean;
   avatarFile: string | null;
   exp: number;
@@ -73,16 +74,18 @@ export async function getSharedClaims(): Promise<SharedClaims | null> {
 
 // Upsert le miroir local à partir des claims du token — garantit que la ligne
 // User existe avant tout write sur une table qui la référence par FK
-// (GameResult, UserAchievement, UserTrackNote), et garde username/avatar/
-// isAdmin à jour localement. passwordHash local n'est plus jamais lu : il
-// ne sert qu'à satisfaire la contrainte NOT NULL du schéma.
+// (GameResult, UserAchievement, UserTrackNote), et garde username/
+// displayName/avatar/isAdmin à jour localement. displayName est éditable
+// uniquement sur cooloss (plus de PATCH local ici) ; passwordHash local n'est
+// plus jamais lu, il ne sert qu'à satisfaire la contrainte NOT NULL du schéma.
 async function mirrorUser(claims: SharedClaims) {
   return prisma.user.upsert({
     where: { id: claims.uid },
-    update: { username: claims.username, avatarFile: claims.avatarFile, isAdmin: claims.isAdmin },
+    update: { username: claims.username, displayName: claims.displayName, avatarFile: claims.avatarFile, isAdmin: claims.isAdmin },
     create: {
       id: claims.uid,
       username: claims.username,
+      displayName: claims.displayName,
       avatarFile: claims.avatarFile,
       isAdmin: claims.isAdmin,
       passwordHash: '',
@@ -99,8 +102,7 @@ export async function getCurrentUserId(): Promise<number | null> {
   return claims.uid;
 }
 
-// Pour les routes qui ont besoin du profil complet (displayName inclus,
-// propre à Blindtoss et absent des claims partagés).
+// Pour les routes qui ont besoin du profil complet.
 export async function getCurrentUser() {
   const claims = await getSharedClaims();
   if (!claims) return null;

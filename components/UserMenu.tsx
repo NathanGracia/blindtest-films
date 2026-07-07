@@ -92,8 +92,8 @@ export default function UserMenu({ user, onLoginClick, onLogout }: Props) {
             </svg>
             Mes notes
           </Link>
-          <Link
-            href="/profile/edit"
+          <a
+            href="https://cooloss.nathangracia.com/profile/edit"
             onClick={() => setOpen(false)}
             className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/10 transition-colors text-sm"
           >
@@ -101,7 +101,7 @@ export default function UserMenu({ user, onLoginClick, onLogout }: Props) {
               <path strokeLinecap="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
             Modifier le profil
-          </Link>
+          </a>
           {user.isAdmin && (
             <>
               <div className="border-t border-white/10 mx-3" />

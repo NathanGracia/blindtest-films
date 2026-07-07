@@ -9,6 +9,7 @@
 export interface SharedClaimsEdge {
   uid: number;
   username: string;
+  displayName: string | null;
   isAdmin: boolean;
   avatarFile: string | null;
   exp: number;

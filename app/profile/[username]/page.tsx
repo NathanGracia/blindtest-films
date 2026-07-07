@@ -98,15 +98,15 @@ export default async function ProfilePage({ params }: Props) {
               </svg>
               Mes notes
             </Link>
-            <Link
-              href="/profile/edit"
+            <a
+              href="https://cooloss.nathangracia.com/profile/edit"
               className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition-all text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
               Modifier
-            </Link>
+            </a>
           </div>
         )}
       </div>
