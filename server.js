@@ -245,6 +245,42 @@ async function saveLadderScore(pseudo, score) {
   }
 }
 
+// Sauvegarder le score dans le ladder PRIVÉ (parties perso, séparé du public, upsert)
+async function savePrivateLadderScore(pseudo, score) {
+  if (!pseudo || score <= 0) return;
+
+  const normalizedPseudo = pseudo.trim().toLowerCase();
+  const weekId = 'all-time';
+
+  try {
+    const existing = await prisma.privateLadderEntry.findUnique({
+      where: { pseudo_weekId: { pseudo: normalizedPseudo, weekId } },
+    });
+
+    if (existing) {
+      if (score > existing.bestScore) {
+        await prisma.privateLadderEntry.update({
+          where: { pseudo_weekId: { pseudo: normalizedPseudo, weekId } },
+          data: { bestScore: score, lastGameAt: new Date(), gamesPlayed: { increment: 1 } },
+        });
+        console.log(`[LADDER-PRIVÉ] ${pseudo}: nouveau best ${score}`);
+      } else {
+        await prisma.privateLadderEntry.update({
+          where: { pseudo_weekId: { pseudo: normalizedPseudo, weekId } },
+          data: { gamesPlayed: { increment: 1 } },
+        });
+      }
+    } else {
+      await prisma.privateLadderEntry.create({
+        data: { pseudo: normalizedPseudo, bestScore: score, weekId, gamesPlayed: 1 },
+      });
+      console.log(`[LADDER-PRIVÉ] ${pseudo}: première entrée ${score} pts`);
+    }
+  } catch (error) {
+    console.error('[LADDER-PRIVÉ] Erreur sauvegarde:', error);
+  }
+}
+
 // Calcul de la distance de Levenshtein (nombre de modifications nécessaires)
 function levenshteinDistance(str1, str2) {
   const m = str1.length;
@@ -832,31 +868,47 @@ app.prepare().then(async () => {
     let currentPseudo = null;
     let currentUserId = null; // null = guest
 
-    // Vérifier le token (synchrone) et lancer la DB en parallèle (sans bloquer)
+    // Vérifier le token partagé (synchrone) et lancer la DB en parallèle (sans
+    // bloquer) — même schéma de token que cooloss/lib/sharedToken.ts, ancré
+    // sur une frontière de cookie car d'autres cookies du même domaine
+    // partagé peuvent être présents dans le header.
     const rawCookie = socket.handshake.headers.cookie || '';
-    const match = rawCookie.match(/blindtoss_user_session=([^;]+)/);
+    const match = rawCookie.match(/(?:^|;\s*)nathangracia_session=([^;]+)/);
     let displayNamePromise = Promise.resolve({ username: null, displayName: null, avatarFile: null });
 
     if (match) {
       try {
         const token = decodeURIComponent(match[1]);
-        const parts = token.split(':');
-        if (parts.length === 3) {
-          const [userIdStr, expiresAtStr, hmac] = parts;
-          const expiresAt = parseInt(expiresAtStr, 10);
-          if (Date.now() < expiresAt) {
-            const crypto = require('crypto');
-            const secret = process.env.ADMIN_PASSWORD || 'blindtoss-user-secret';
-            const expected = crypto.createHmac('sha256', secret)
-              .update(`${userIdStr}:${expiresAtStr}`)
-              .digest('hex');
-            if (hmac === expected) {
-              currentUserId = parseInt(userIdStr, 10);
-              // Charger displayName + avatarFile en parallèle — les handlers s'enregistrent immédiatement
-              displayNamePromise = prisma.user.findUnique({
-                where: { id: currentUserId },
-                select: { username: true, displayName: true, avatarFile: true },
-              }).then(u => ({ username: u?.username || null, displayName: u?.displayName || null, avatarFile: u?.avatarFile || null })).catch(() => ({ username: null, displayName: null, avatarFile: null }));
+        const parts = token.split('.');
+        if (parts.length === 2) {
+          const [payloadB64, signature] = parts;
+          const crypto = require('crypto');
+          const secret = process.env.SHARED_SESSION_SECRET;
+          const expected = secret
+            ? crypto.createHmac('sha256', secret).update(payloadB64).digest('hex')
+            : null;
+          if (
+            expected &&
+            Buffer.byteLength(signature) === Buffer.byteLength(expected) &&
+            crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))
+          ) {
+            const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+            if (Date.now() < claims.exp) {
+              currentUserId = claims.uid;
+              // Miroir local (FK GameResult/UserTrackNote) + displayName en
+              // parallèle — les handlers s'enregistrent immédiatement, même
+              // pattern non-bloquant que l'ancien code (voir CLAUDE.md).
+              displayNamePromise = prisma.user.upsert({
+                where: { id: claims.uid },
+                update: { username: claims.username, avatarFile: claims.avatarFile, isAdmin: claims.isAdmin },
+                create: {
+                  id: claims.uid,
+                  username: claims.username,
+                  avatarFile: claims.avatarFile,
+                  isAdmin: claims.isAdmin,
+                  passwordHash: '',
+                },
+              }).then(u => ({ username: u.username, displayName: u.displayName, avatarFile: u.avatarFile })).catch(() => ({ username: claims.username, displayName: null, avatarFile: claims.avatarFile }));
             }
           }
         }
@@ -1577,7 +1629,8 @@ app.prepare().then(async () => {
       // Sauvegarder résultats pour joueurs connectés
       for (let i = 0; i < sortedPlayers.length; i++) {
         const p = sortedPlayers[i];
-        await saveLadderScore(p.pseudo, p.score);
+        // Ladder PRIVÉ uniquement (pas le ladder public) : par pseudo → invités inclus
+        await savePrivateLadderScore(p.pseudo, p.score);
         await saveGameResult({
           userId: p.userId || null,
           score: p.score,

@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserAvatar from '@/components/UserAvatar';
-import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
-import { verifyUserToken } from '@/lib/userAuth';
+import { getCurrentUserId } from '@/lib/sharedAuth';
 import { ACHIEVEMENTS } from '@/lib/achievements';
 import RemoveAchievementButton from '@/components/RemoveAchievementButton';
 
@@ -58,9 +57,7 @@ export default async function ProfilePage({ params }: Props) {
   });
 
   // Vérifier si le visiteur est le propriétaire du profil
-  const cookieStore = await cookies();
-  const session = cookieStore.get('blindtoss_user_session');
-  const currentUserId = session ? verifyUserToken(session.value) : null;
+  const currentUserId = await getCurrentUserId();
   const isOwner = currentUserId === user.id;
 
   const displayName = user.displayName || user.username;

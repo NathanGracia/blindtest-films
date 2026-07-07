@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyUserToken } from '@/lib/userAuth';
+import { getCurrentUserId } from '@/lib/sharedAuth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const session = cookieStore.get('blindtoss_user_session');
-  if (!session?.value) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
-
-  const userId = verifyUserToken(session.value);
-  if (!userId) return NextResponse.json({ error: 'Session invalide' }, { status: 401 });
+  const userId = await getCurrentUserId();
+  if (!userId) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
 
   const notes = await prisma.userTrackNote.findMany({
     where: { userId, note: { not: '' } },
@@ -34,12 +29,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const cookieStore = await cookies();
-  const session = cookieStore.get('blindtoss_user_session');
-  if (!session?.value) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
-
-  const userId = verifyUserToken(session.value);
-  if (!userId) return NextResponse.json({ error: 'Session invalide' }, { status: 401 });
+  const userId = await getCurrentUserId();
+  if (!userId) return NextResponse.json({ error: 'Non connecté' }, { status: 401 });
 
   const { trackId, note } = await request.json();
   if (!trackId) return NextResponse.json({ error: 'trackId requis' }, { status: 400 });

@@ -8,8 +8,8 @@ import CategorySelector from '@/components/CategorySelector';
 import LadderSidebar from '@/components/LadderSidebar';
 import UpdatesSidebar from '@/components/UpdatesSidebar';
 import UserMenu from '@/components/UserMenu';
-import AuthModal from '@/components/AuthModal';
 import { getSocket } from '@/lib/socket';
+import { goToCoolossLogin } from '@/lib/coolossLogin';
 
 interface CurrentUser {
   id: number;
@@ -30,7 +30,6 @@ export default function Home() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Charger la session utilisateur
   useEffect(() => {
@@ -196,12 +195,6 @@ export default function Home() {
     });
   };
 
-  const handleAuthSuccess = (user: CurrentUser) => {
-    setCurrentUser(user);
-    setPseudo(user.username);
-    setShowAuthModal(false);
-  };
-
   const handleLogout = () => {
     setCurrentUser(null);
     const savedPseudo = sessionStorage.getItem('blindtoss_pseudo');
@@ -214,17 +207,10 @@ export default function Home() {
       <div className="flex justify-end p-3 pr-4">
         <UserMenu
           user={currentUser}
-          onLoginClick={() => setShowAuthModal(true)}
+          onLoginClick={goToCoolossLogin}
           onLogout={handleLogout}
         />
       </div>
-
-      {showAuthModal && (
-        <AuthModal
-          onClose={() => setShowAuthModal(false)}
-          onSuccess={handleAuthSuccess}
-        />
-      )}
 
       <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center p-4 gap-8">
         {/* Sidebar Nouveautés - centré dans l'espace de gauche */}
@@ -274,7 +260,7 @@ export default function Home() {
                 maxLength={20}
               />
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={goToCoolossLogin}
                 className="mt-2 text-white/30 hover:text-white/60 text-xs transition-colors"
               >
                 Créer un compte pour sauvegarder tes scores →
